@@ -31,5 +31,5 @@ class RecordPressureHandlerTest(TestCase):
         response_text = self.handler.handle(validated_request_data)
         self.assertEqual(
             response_text,
-            "Не удалось распознать цифры давления. Попробуйте сказать, например, ‘давление 120 на 80’.",
+            None,
         )

@@ -40,7 +40,7 @@ class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BloodPressureMeasurement
-        fields = ["systolic", "diastolic", "pulse"]
+        fields = ["systolic", "diastolic", "pulse", "created_at"]
 
 
 # --- Request Serializers ---

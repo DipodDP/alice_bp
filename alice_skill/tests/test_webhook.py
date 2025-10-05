@@ -43,3 +43,32 @@ class AliceWebhookViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("Здравствуйте", response.data["response"]["text"])
 
+
+    def test_last_measurement_no_records(self):
+        self.assertEqual(BloodPressureMeasurement.objects.count(), 0)
+        payload = {
+            "request": {"original_utterance": "покажи последнее давление"},
+            "session": {"session_id": "last-1", "user_id": "u1"},
+            "version": "1.0",
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["response"]["text"], "Записей пока нет.")
+        self.assertEqual(response.data["session"]["session_id"], payload["session"]["session_id"])
+        self.assertEqual(response.data["version"], payload["version"])
+
+    def test_last_measurement_with_record(self):
+        BloodPressureMeasurement.objects.create(systolic=120, diastolic=80, pulse=70)
+        payload = {
+            "request": {"original_utterance": "покажи последнее давление"},
+            "session": {"session_id": "last-2", "user_id": "u2"},
+            "version": "1.0",
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        text = response.data["response"]["text"]
+        self.assertIn("Последняя запись: 120/80", text)
+        self.assertIn(", пульс 70", text)
+        self.assertIn("(создано", text)
+        self.assertEqual(response.data["session"]["session_id"], payload["session"]["session_id"])
+        self.assertEqual(response.data["version"], payload["version"])

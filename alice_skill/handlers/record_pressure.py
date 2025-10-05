@@ -1,6 +1,7 @@
 import re
 from ..serializers import BloodPressureMeasurementSerializer
 
+
 class RecordPressureHandler:
     def handle(self, validated_data):
         req = validated_data["request"]
@@ -30,7 +31,7 @@ class RecordPressureHandler:
                 break
 
         if not match:
-            return "Не удалось распознать цифры давления. Попробуйте сказать, например, ‘давление 120 на 80’."
+            return
 
         systolic = int(match.group(1))
         diastolic = int(match.group(2))
@@ -49,4 +50,6 @@ class RecordPressureHandler:
             if instance.pulse is not None:
                 return f"Запомнил давление {systolic} на {diastolic}, пульс {instance.pulse}"
             return f"Запомнил давление {systolic} на {diastolic}"
-        return "Некорректные значения давления. Пожалуйста, проверьте данные и повторите."
+        return (
+            "Некорректные значения давления. Пожалуйста, проверьте данные и повторите."
+        )
