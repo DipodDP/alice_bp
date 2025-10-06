@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from .handlers.record_pressure import RecordPressureHandler
 from .handlers.last_measurement import LastMeasurementHandler
-from .handlers.unparsed import UnparsedHandler
+from .handlers.common import StartDialogHandler, UnparsedHandler
 from .serializers import AliceRequestSerializer, AliceResponseSerializer
 from .helpers import build_alice_response_payload
 
@@ -15,6 +15,7 @@ class AliceWebhookView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
     handlers = [
+        StartDialogHandler(),
         RecordPressureHandler(),
         LastMeasurementHandler(),
         UnparsedHandler(),
@@ -33,9 +34,9 @@ class AliceWebhookView(APIView):
         for handler in self.handlers:
             try:
                 response_text = handler.handle(validated_request)
-            except Exception:
+            except Exception as e:
                 logger.exception(
-                    "Handler raised an exception; continuing to next handler"
+                    f"Handler raised an exception:\n {e};\n...continuing to next handler"
                 )
                 continue
             if response_text:

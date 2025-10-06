@@ -1,4 +1,4 @@
-class BaseHandler:
+class BaseAliceHandler:
     """Common utilities for Alice skill handlers."""
 
     def get_original_utterance(self, validated_request_data: dict) -> str:
