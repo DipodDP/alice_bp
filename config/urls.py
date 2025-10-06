@@ -19,5 +19,5 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('alice_webhook/', include('alice_skill.urls')),
+    path('', include('alice_skill.urls')),
 ]

@@ -2,6 +2,9 @@ import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework import viewsets
+from .models import BloodPressureMeasurement
+from .serializers import BloodPressureMeasurementSerializer
 from .handlers.record_pressure import RecordPressureHandler
 from .handlers.last_measurement import LastMeasurementHandler
 from .handlers.common import StartDialogHandler, UnparsedHandler
@@ -52,3 +55,8 @@ class AliceWebhookView(APIView):
         response_serializer.is_valid(raise_exception=True)
 
         return Response(response_serializer.validated_data)
+
+
+class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
+    queryset = BloodPressureMeasurement.objects.all().order_by("-created_at")
+    serializer_class = BloodPressureMeasurementSerializer
