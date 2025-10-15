@@ -1,0 +1,4 @@
+aiogram~=3.0
+environs~=9.0
+betterlogging
+aiogram-dialog~=2.2.0

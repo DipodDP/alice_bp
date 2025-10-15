@@ -13,3 +13,8 @@ dependencies = [
 dev = [
     "pytest-django>=4.11.1",
 ]
+
+[tool.uv.workspace]
+members = [
+    "tgbot_bp",
+]
