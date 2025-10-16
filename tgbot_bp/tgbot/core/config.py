@@ -4,7 +4,7 @@ from typing import Optional
 from environs import Env
 
 
-WEBHOOK_PATH = '/webhook'
+WEBHOOK_PATH = "/webhook"
 
 
 @dataclass
@@ -27,18 +27,18 @@ class TgBot:
         """
         Creates the TgBot object from environment variables.
         """
-        token = env.str('BOT_TOKEN')
-        admin_ids = list(map(int, env.list('ADMINS')))
-        console_log_level = env.str('CONSOLE_LOGGER_LVL')
+        token = env.str("BOT_TOKEN")
+        admin_ids = list(map(int, env.list("ADMINS")))
+        console_log_level = env.str("CONSOLE_LOGGER_LVL")
         # admin_ids = list(map(
         #     lambda item: int(item) if isinstance(item, int) else str(item),
         #     env.list("ADMINS")
         # ))
-        use_redis = env.bool('USE_REDIS')
-        proxy_url = env.str('PROXY_URL', default=None)
-        webhook_host = env.str('WEBHOOK_HOST', default=None)
-        webapp_host = env.str('WEBAPP_HOST', default=None)
-        webapp_port = env.int('WEBAPP_PORT', default=None)
+        use_redis = env.bool("USE_REDIS")
+        proxy_url = env.str("PROXY_URL", default=None)
+        webhook_host = env.str("WEBHOOK_HOST", default=None)
+        webapp_host = env.str("WEBAPP_HOST", default=None)
+        webapp_port = env.int("WEBAPP_PORT", default=None)
         return TgBot(
             token=token,
             admin_ids=admin_ids,
@@ -75,21 +75,44 @@ class RedisConfig:
         Constructs and returns a Redis DSN (Data Source Name) for this database configuration.
         """
         if self.redis_pass:
-            return f'redis://:{self.redis_pass}@{self.redis_host}:{self.redis_port}/0'
+            return f"redis://:{self.redis_pass}@{self.redis_host}:{self.redis_port}/0"
         else:
-            return f'redis://{self.redis_host}:{self.redis_port}/0'
+            return f"redis://{self.redis_host}:{self.redis_port}/0"
 
     @staticmethod
     def from_env(env: Env):
         """
         Creates the RedisConfig object from environment variables.
         """
-        redis_pass = env.str('REDIS_PASSWORD')
-        redis_port = env.int('REDIS_PORT')
-        redis_host = env.str('REDIS_HOST')
+        redis_pass = env.str("REDIS_PASSWORD")
+        redis_port = env.int("REDIS_PORT")
+        redis_host = env.str("REDIS_HOST")
 
         return RedisConfig(
             redis_pass=redis_pass, redis_port=redis_port, redis_host=redis_host
+        )
+
+
+@dataclass
+class DjangoApiConfig:
+    """
+    Django API configuration class.
+    """
+
+    base_url: str
+    api_token: str | None = None
+
+    @staticmethod
+    def from_env(env: Env):
+        """
+        Creates the DjangoApiConfig object from environment variables.
+        """
+        base_url = env.str("DJANGO_API_BASE_URL", default="http://localhost:8000")
+        api_token = env.str("DJANGO_API_TOKEN", default=None)
+
+        return DjangoApiConfig(
+            base_url=base_url,
+            api_token=api_token,
         )
 
 
@@ -135,11 +158,14 @@ class Config:
         Holds the settings specific to the database (default is None).
     redis : Optional[RedisConfig]
         Holds the settings specific to Redis (default is None).
+    django_api : DjangoApiConfig
+        Holds the settings specific to Django API.
     """
 
     tg_bot: TgBot
     misc: Miscellaneous
     redis: Optional[RedisConfig] = None
+    django_api: DjangoApiConfig = None
 
 
 def load_config(path: str | None = None) -> Config:
@@ -159,4 +185,5 @@ def load_config(path: str | None = None) -> Config:
         tg_bot=TgBot.from_env(env),
         # redis=RedisConfig.from_env(env),
         misc=Miscellaneous.from_env(env),
+        django_api=DjangoApiConfig.from_env(env),
     )

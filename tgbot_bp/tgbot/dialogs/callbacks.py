@@ -1,3 +1,4 @@
+import logging
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from aiogram.utils.formatting import as_key_value, as_marked_list, as_section
@@ -34,14 +35,24 @@ async def selected_interval(
     dialog_manager: DialogManager,
     item_id: str,
 ):
-    dialog_manager.dialog_data["user_id"] = int(item_id)
-    # event = dialog_manager.event
-    # middleware_data = dialog_manager.middleware_data
-    # start_data = dialog_manager.start_data
-    logger.debug(f"Dialog data: {dialog_manager.dialog_data}")
-    await dialog_manager.switch_to(MainMenu.main)
-    # or
-    # await dialog_manager.next()
+    """Handle interval selection and store the selected interval."""
+    selected_interval = int(item_id)
+    dialog_manager.dialog_data["selected_interval"] = selected_interval
+
+    logger.info(f"Selected interval: {selected_interval}")
+
+    # Switch to the results window to show pressure data
+    await dialog_manager.switch_to(MainMenu.pressure_results)
+
+
+async def selected_measurement(
+    callback_query: CallbackQuery,
+    widget: Select,
+    dialog_manager: DialogManager,
+    item_id: str,
+):
+    """Get pressure measurement options."""
+    logger.error("Options are not implemented for now")
 
 
 async def action_done(
