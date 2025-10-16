@@ -1,6 +1,8 @@
 from django.db import models
 
+
 class BloodPressureMeasurement(models.Model):
+    user_id = models.CharField(max_length=255, db_index=True)
     systolic = models.PositiveIntegerField()
     diastolic = models.PositiveIntegerField()
     pulse = models.PositiveIntegerField(null=True, blank=True)

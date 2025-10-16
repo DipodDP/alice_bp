@@ -12,6 +12,6 @@ class BloodPressureSerializerValidationTests(TestCase):
     def test_relational_validation(self):
         ser = BloodPressureMeasurementSerializer(data={"systolic": 80, "diastolic": 90})
         self.assertFalse(ser.is_valid())
-        ser = BloodPressureMeasurementSerializer(data={"systolic": 120, "diastolic": 80})
+        ser = BloodPressureMeasurementSerializer(data={"user_id": "u", "systolic": 120, "diastolic": 80})
         self.assertTrue(ser.is_valid())
 

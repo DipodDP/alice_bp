@@ -12,7 +12,7 @@ class RecordPressureHandlerTest(TestCase):
         self.assertEqual(BloodPressureMeasurement.objects.count(), 0)
         validated_request_data = {
             "request": {"original_utterance": "запомни давление 120 на 80"},
-            "session": {},
+            "session": {"user_id": "u"},
             "version": "1.0",
         }
         response_text = self.handler.handle(validated_request_data)
@@ -43,12 +43,12 @@ class LastMeasurementHandlerTest(TestCase):
     def test_handle_with_measurements(self):
         """Test handler returns last measurement when measurements exist."""
         # Create test measurements
-        BloodPressureMeasurement.objects.create(systolic=120, diastolic=80, pulse=70)
-        BloodPressureMeasurement.objects.create(systolic=130, diastolic=85, pulse=75)
+        BloodPressureMeasurement.objects.create(user_id="u", systolic=120, diastolic=80, pulse=70)
+        BloodPressureMeasurement.objects.create(user_id="u", systolic=130, diastolic=85, pulse=75)
 
         validated_request_data = {
             "request": {"original_utterance": "покажи последнее давление"},
-            "session": {},
+            "session": {"user_id": "u"},
             "version": "1.0",
         }
 
@@ -61,11 +61,11 @@ class LastMeasurementHandlerTest(TestCase):
 
     def test_handle_without_pulse(self):
         """Test handler works when measurement has no pulse."""
-        BloodPressureMeasurement.objects.create(systolic=110, diastolic=70, pulse=None)
+        BloodPressureMeasurement.objects.create(user_id="u", systolic=110, diastolic=70, pulse=None)
 
         validated_request_data = {
             "request": {"original_utterance": "последнее давление"},
-            "session": {},
+            "session": {"user_id": "u"},
             "version": "1.0",
         }
 
@@ -79,7 +79,7 @@ class LastMeasurementHandlerTest(TestCase):
         """Test handler returns appropriate message when no measurements exist."""
         validated_request_data = {
             "request": {"original_utterance": "покажи давление"},
-            "session": {},
+            "session": {"user_id": "u"},
             "version": "1.0",
         }
 
@@ -89,11 +89,11 @@ class LastMeasurementHandlerTest(TestCase):
 
     def test_handle_no_keywords(self):
         """Test handler returns None when no keywords match."""
-        BloodPressureMeasurement.objects.create(systolic=120, diastolic=80)
+        BloodPressureMeasurement.objects.create(user_id="u", systolic=120, diastolic=80)
 
         validated_request_data = {
             "request": {"original_utterance": "какая-то ерунда"},
-            "session": {},
+            "session": {"user_id": "u"},
             "version": "1.0",
         }
 
@@ -103,11 +103,11 @@ class LastMeasurementHandlerTest(TestCase):
 
     def test_handle_partial_keyword_match(self):
         """Test handler works with partial keyword matches."""
-        BloodPressureMeasurement.objects.create(systolic=125, diastolic=82)
+        BloodPressureMeasurement.objects.create(user_id="u", systolic=125, diastolic=82)
 
         validated_request_data = {
             "request": {"original_utterance": "последнее"},
-            "session": {},
+            "session": {"user_id": "u"},
             "version": "1.0",
         }
 
@@ -118,11 +118,11 @@ class LastMeasurementHandlerTest(TestCase):
 
     def test_handle_case_insensitive(self):
         """Test handler works with different cases."""
-        BloodPressureMeasurement.objects.create(systolic=115, diastolic=75)
+        BloodPressureMeasurement.objects.create(user_id="u", systolic=115, diastolic=75)
 
         validated_request_data = {
             "request": {"original_utterance": "ПОКАЖИ ДАВЛЕНИЕ"},
-            "session": {},
+            "session": {"user_id": "u"},
             "version": "1.0",
         }
 

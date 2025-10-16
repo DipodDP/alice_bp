@@ -51,7 +51,12 @@ class RecordPressureHandler(BaseAliceHandler):
             f"RecordPressureHandler: Extracted values - systolic: {systolic}, diastolic: {diastolic}, pulse: {pulse}"
         )
 
-        payload = {"systolic": systolic, "diastolic": diastolic}
+        session = validated_request_data.get("session", {})
+        user_id = session.get("user_id")
+        if not user_id:
+            logger.debug("RecordPressureHandler: Missing user_id in session; skipping")
+            return
+        payload = {"user_id": user_id, "systolic": systolic, "diastolic": diastolic}
         if pulse is not None:
             payload["pulse"] = pulse
 

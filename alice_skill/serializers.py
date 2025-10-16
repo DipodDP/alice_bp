@@ -3,6 +3,7 @@ from .models import BloodPressureMeasurement
 
 
 class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
+    user_id = serializers.CharField(required=True, allow_blank=False)
     MIN_SYSTOLIC = 50
     MAX_SYSTOLIC = 300
     MIN_DIASTOLIC = 30
@@ -40,7 +41,7 @@ class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BloodPressureMeasurement
-        fields = ["systolic", "diastolic", "pulse", "created_at"]
+        fields = ["user_id", "systolic", "diastolic", "pulse", "created_at"]
 
 
 # --- Request Serializers ---

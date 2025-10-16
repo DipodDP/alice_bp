@@ -24,7 +24,16 @@ class LastMeasurementHandler(BaseAliceHandler):
             return
 
         logger.debug("LastMeasurementHandler: Fetching last blood pressure measurement")
-        last = BloodPressureMeasurement.objects.order_by("-created_at").first()
+        session = validated_request_data.get("session", {})
+        user_id = session.get("user_id")
+        if not user_id:
+            logger.debug("LastMeasurementHandler: Missing user_id in session; returning no records")
+            return "Записей пока нет."
+        last = (
+            BloodPressureMeasurement.objects.filter(user_id=user_id)
+            .order_by("-created_at")
+            .first()
+        )
         if not last:
             logger.info("LastMeasurementHandler: No measurements found in database")
             return "Записей пока нет."

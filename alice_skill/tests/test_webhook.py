@@ -19,6 +19,7 @@ class AliceWebhookViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(BloodPressureMeasurement.objects.count(), 1)
         measurement = BloodPressureMeasurement.objects.first()
+        self.assertEqual(measurement.user_id, "test-user")
         self.assertEqual(measurement.systolic, 130)
         self.assertEqual(measurement.diastolic, 75)
         expected_response = {
@@ -58,7 +59,7 @@ class AliceWebhookViewTest(APITestCase):
         self.assertEqual(response.data["version"], payload["version"])
 
     def test_last_measurement_with_record(self):
-        BloodPressureMeasurement.objects.create(systolic=120, diastolic=80, pulse=70)
+        BloodPressureMeasurement.objects.create(user_id="u2", systolic=120, diastolic=80, pulse=70)
         payload = {
             "request": {"original_utterance": "покажи последнее давление"},
             "session": {"session_id": "last-2", "user_id": "u2"},

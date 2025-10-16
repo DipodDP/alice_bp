@@ -10,5 +10,9 @@ class BaseAliceHandler:
         session = validated_request_data.get("session", {})
         return bool(session.get("new"))
 
+    def get_user_id(self, validated_request_data: dict) -> str | None:
+        session = validated_request_data.get("session", {})
+        return session.get("user_id")
+
     def handle(self, validated_request_data: dict) -> str:  # pragma: no cover
         raise NotImplementedError

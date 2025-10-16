@@ -14,7 +14,7 @@ class MeasurementsApiBasicCrudTests(APITestCase):
         self.assertEqual(response.data, [])
 
     def test_create_and_retrieve(self):
-        payload = {"systolic": 125, "diastolic": 82, "pulse": 70}
+        payload = {"user_id": "u", "systolic": 125, "diastolic": 82, "pulse": 70}
         create_resp = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(BloodPressureMeasurement.objects.count(), 1)
@@ -33,7 +33,7 @@ class MeasurementsApiUpdateDeleteOrderingTests(APITestCase):
         self.list_url = reverse("measurement-list")
 
     def test_update_and_delete(self):
-        m = BloodPressureMeasurement.objects.create(systolic=120, diastolic=80, pulse=65)
+        m = BloodPressureMeasurement.objects.create(user_id="u", systolic=120, diastolic=80, pulse=65)
         detail_url = reverse("measurement-detail", args=[m.pk])
 
         # partial update
@@ -47,8 +47,8 @@ class MeasurementsApiUpdateDeleteOrderingTests(APITestCase):
         self.assertEqual(BloodPressureMeasurement.objects.count(), 0)
 
     def test_ordering_by_created_desc(self):
-        BloodPressureMeasurement.objects.create(systolic=110, diastolic=70, pulse=60)
-        BloodPressureMeasurement.objects.create(systolic=130, diastolic=85, pulse=75)
+        BloodPressureMeasurement.objects.create(user_id="u", systolic=110, diastolic=70, pulse=60)
+        BloodPressureMeasurement.objects.create(user_id="u", systolic=130, diastolic=85, pulse=75)
         list_resp = self.client.get(self.list_url)
         self.assertEqual(list_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(list_resp.data[0]["systolic"], 130)
