@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "alice_skill",
+    "pyanywhere_bg",
 ]
 
 MIDDLEWARE = [
@@ -160,3 +161,7 @@ LOGGING = {
         },
     },
 }
+
+SITE_URL = "https://your-domain.com"
+STARTUP_PATH = "/background/start"
+STARTUP_INTERVAL = 60 * 30
