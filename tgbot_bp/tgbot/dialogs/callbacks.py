@@ -4,7 +4,6 @@ from aiogram.types import CallbackQuery, Message
 from aiogram.utils.formatting import as_key_value, as_marked_list, as_section
 from aiogram_dialog import DialogManager
 from aiogram_dialog.widgets.kbd import Button, Select
-from betterlogging import logging
 
 from tgbot.keyboards.reply import user_menu_keyboard
 from tgbot.messages.handlers_msg import UserHandlerMessages
