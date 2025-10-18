@@ -70,20 +70,6 @@ def start(request):
         status = process.poll()
 
     if status is not None:
-        # Try to find python inside poetry venv, fallback to 'python'
-        try:
-            result_python_path = subprocess.run(
-                ["uv", "run", "which", "python"], capture_output=True, text=True
-            )
-            python_path = (
-                result_python_path.stdout.strip()
-                if result_python_path.returncode == 0
-                else "python"
-            )
-        except Exception as e:
-            logger.exception("Failed to probe UV python path: %s", e)
-            python_path = "python"
-
         site_url = getattr(settings, "SITE_URL", None)
         if not site_url:
             logger.error("SITE_URL is not configured in Django settings.")
@@ -93,8 +79,19 @@ def start(request):
 
         # Launch the external script and keep subprocess handle in global 'process'
         try:
+            cwd = getattr(settings, "BASE_DIR", None)
+            # open logs to files (optional) or use PIPEs
+            # stdout = open(os.path.join(cwd, "uv_stdout.log"), "a", buffering=1)
+            # stderr = open(os.path.join(cwd, "uv_stderr.log"), "a", buffering=1)
+
+
+            cmd = ["uv", "run", "tgbot_bp/main.py", site_url]
             process = subprocess.Popen(
-                f"{python_path} tgbot_bp/main.py {site_url}", shell=True
+                cmd,
+                cwd=cwd,
+            #    stdout=stdout,
+            #    stderr=stderr,
+            #    start_new_session=True,  # detach signals on POSIX
             )
             logger.info(
                 "Started main.py subprocess (pid=%s) with SITE_URL=%s",
