@@ -84,3 +84,26 @@ class BloodPressureApi(BaseClient):
             return None
 
         return results[0] if results else None
+
+    async def complete_link(self, telegram_user_id: int, token: str) -> Optional[dict]:
+        """Send a token to complete the user linking process."""
+        try:
+            status_code, data = await self._make_request(
+                method="POST",
+                url="/api/v1/link/complete/",
+                json={
+                    "telegram_user_id": str(telegram_user_id),
+                    "token": token
+                },
+                headers=self._auth_headers(),
+            )
+            if status_code == 200:
+                return data
+            self.log.error(
+                f"Failed to complete link for user {telegram_user_id}. "
+                f"Status: {status_code}, Response: {data}"
+            )
+            return data  # Return error data as well
+        except ClientError as e:
+            self.log.error("Failed to complete link: %s", e)
+            return None
