@@ -35,7 +35,13 @@ class TgBot:
         #     env.list("ADMINS")
         # ))
         use_redis = env.bool("USE_REDIS")
-        proxy_url = env.str("HTTPS_PROXY",  default=None) or env.str("HTTP_PROXY", default=None)
+
+        proxy_vars = (
+            env.str(var, default=None)
+            for var in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy")
+        )
+        proxy_url = next(filter(None, proxy_vars), None)
+
         webhook_host = env.str("WEBHOOK_HOST", default=None)
         webapp_host = env.str("WEBAPP_HOST", default=None)
         webapp_port = env.int("WEBAPP_PORT", default=None)
