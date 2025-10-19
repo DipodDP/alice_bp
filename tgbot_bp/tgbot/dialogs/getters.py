@@ -67,7 +67,9 @@ async def get_measurements_data(dialog_manager: DialogManager, **kwargs):
 
     try:
         api_client = BloodPressureApi(
-            base_url=config.django_api.base_url, api_token=config.django_api.api_token
+            base_url=config.django_api.base_url,
+            api_token=config.django_api.api_token,
+            proxy=config.tg_bot.proxy_url,
         )
         # Calculate date range based on selected interval
         end_date = datetime.now(timezone.utc)

@@ -19,8 +19,9 @@ if TYPE_CHECKING:
 class BaseClient:
     """Represents base API client."""
 
-    def __init__(self, base_url: str | URL) -> None:
+    def __init__(self, base_url: str | URL, proxy: str | None =None) -> None:
         self._base_url = base_url
+        self._proxy = proxy
         self._session: ClientSession | None = None
         self.log = logging.getLogger(self.__class__.__name__)
 
@@ -40,7 +41,7 @@ class BaseClient:
     @backoff.on_exception(
         backoff.expo,
         ClientError,
-        max_time=60,
+        max_time=30,
     )
     async def _make_request(
         self,
@@ -61,19 +62,29 @@ class BaseClient:
             json,
             params,
         )
-        async with session.request(
-            method, url, params=params, json=json, headers=headers, data=data
-        ) as response:
-            status = response.status
-            if status != 200:
-                s = await response.text()
-                raise ClientError(f"Got status {status} for {method} {url}: {s}")
-            try:
-                result = await response.json(loads=loads)
-            except Exception as e:
-                self.log.exception(e)
-                self.log.info(f"{await response.text()}")
-                result = {}
+        try:
+            async with session.request(
+                method,
+                url,
+                params=params,
+                json=json,
+                headers=headers,
+                data=data,
+                proxy=self._proxy,
+            ) as response:
+                status = response.status
+                if status != 200:
+                    s = await response.text()
+                    raise ClientError(f"Got status {status} for {method} {url}: {s}")
+                try:
+                    result = await response.json(loads=loads)
+                except Exception as e:
+                    self.log.exception(e)
+                    self.log.info(f"{await response.text()}")
+                    result = {}
+        except Exception as e:
+            self.log.exception("Request %r %r failed: %r", method, url, e)
+            raise
 
         self.log.debug(
             "Got response %r %r with status %r and json %r",

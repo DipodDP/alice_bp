@@ -11,8 +11,10 @@ from infrastructure.bp_api.base import BaseClient
 class BloodPressureApi(BaseClient):
     """Client for Django blood pressure API endpoints."""
 
-    def __init__(self, base_url: str, api_token: Optional[str] = None) -> None:
-        super().__init__(base_url=base_url)
+    def __init__(
+        self, base_url: str, proxy: str | None = None, api_token: str | None = None
+    ) -> None:
+        super().__init__(base_url=base_url, proxy=proxy)
         self._token = api_token
         self.log = logging.getLogger(self.__class__.__name__)
 
