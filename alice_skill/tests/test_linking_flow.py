@@ -227,3 +227,18 @@ class LinkingFlowAPITestCase(APITestCase):
         # 4. Verify the user is now linked to the new Telegram ID
         user.refresh_from_db()
         self.assertEqual(user.telegram_user_id, self.telegram_user_id)
+
+    def test_get_user_by_telegram_id(self):
+        """Ensure we can retrieve a user by their telegram ID."""
+        # 1. Test user found
+        User.objects.create(alice_user_id=self.alice_user_id, telegram_user_id=self.telegram_user_id)
+        url = reverse("user-by-telegram", kwargs={"telegram_id": self.telegram_user_id})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["alice_user_id"], self.alice_user_id)
+
+        # 2. Test user not found
+        url = reverse("user-by-telegram", kwargs={"telegram_id": "nonexistent"})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

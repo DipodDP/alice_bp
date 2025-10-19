@@ -5,20 +5,24 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from rest_framework import viewsets, status
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from .helpers import build_alice_response_payload
 from .models import BloodPressureMeasurement, User, LinkToken
-from .serializers import BloodPressureMeasurementSerializer
+from .services import initiate_linking_process
+from .serializers import (
+    AliceRequestSerializer,
+    AliceResponseSerializer,
+    BloodPressureMeasurementSerializer,
+    UserSerializer,
+)
+from .handlers.common import StartDialogHandler, UnparsedHandler
+from .handlers.link_account import LinkAccountHandler
 from .handlers.record_pressure import RecordPressureHandler
 from .handlers.last_measurement import LastMeasurementHandler
-from .handlers.link_account import LinkAccountHandler
-from .handlers.common import StartDialogHandler, UnparsedHandler
-from .serializers import AliceRequestSerializer, AliceResponseSerializer
-from .helpers import build_alice_response_payload
-from .services import initiate_linking_process
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +35,6 @@ def validate_alice_signature(request_body, headers):
 
 def validate_telegram_bot_request(headers):
     """Placeholder for Telegram bot request validation."""
-    # In a real app, you'd check a secret token like:
-    # return headers.get("X-Bot-Token") == settings.TELEGRAM_BOT_SECRET_TOKEN
     return True
 
 
@@ -49,13 +51,10 @@ class AliceWebhookView(APIView):
 
     def post(self, request):
         logger.info(f"Incoming request: {request.data}")
-        # 1. Validate incoming request
         request_serializer = AliceRequestSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         validated_request = request_serializer.validated_data
 
-        # 2. Try multiple handlers in order to get the response content;
-        # stop at the first that returns a response
         response_text = None
         for handler in self.handlers:
             try:
@@ -68,12 +67,10 @@ class AliceWebhookView(APIView):
             if response_text:
                 break
 
-        # 3. Build the response payload using the helper
         response_payload = build_alice_response_payload(
             response_text, validated_request
         )
 
-        # 4. Validate the final response and send it
         response_serializer = AliceResponseSerializer(data=response_payload)
         response_serializer.is_valid(raise_exception=True)
 
@@ -88,7 +85,6 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
 class InitiateLinkView(APIView):
     """
     Handles the first step of the linking process, initiated by Alice.
-    Generates and returns a one-time code.
     """
     permission_classes = [AllowAny]
 
@@ -163,9 +159,6 @@ class CompleteLinkView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        # if not validate_telegram_bot_request(request.headers):
-        #     return Response({"status": "error", "message": "Invalid origin"}, status=status.HTTP_403_FORBIDDEN)
-
         telegram_user_id = request.data.get("telegram_user_id")
         token = request.data.get("token")
 
@@ -190,7 +183,6 @@ class CompleteLinkView(APIView):
 
         user = link_token.user
 
-        # Break any existing link for this telegram_user_id
         User.objects.filter(telegram_user_id=telegram_user_id).exclude(id=user.id).update(telegram_user_id=None)
 
         user.telegram_user_id = telegram_user_id
@@ -199,3 +191,18 @@ class CompleteLinkView(APIView):
         link_token.delete()
 
         return Response({"status": "success", "message": "Аккаунты успешно связаны!"}, status=status.HTTP_200_OK)
+
+
+class UserByTelegramView(APIView):
+    """
+    Retrieves a user by their Telegram ID.
+    """
+    permission_classes = [AllowAny]  # In production, should be protected
+
+    def get(self, request, telegram_id, *args, **kwargs):
+        try:
+            user = User.objects.get(telegram_user_id=telegram_id)
+            serializer = UserSerializer(user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"status": "error", "message": "User not found"}, status=status.HTTP_404_NOT_FOUND)

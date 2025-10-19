@@ -85,6 +85,21 @@ class BloodPressureApi(BaseClient):
 
         return results[0] if results else None
 
+    async def get_user_by_telegram_id(self, telegram_user_id: int) -> Optional[dict]:
+        """Fetch user data by their telegram ID."""
+        try:
+            status_code, data = await self._make_request(
+                method="GET",
+                url=f"/api/v1/users/by-telegram/{telegram_user_id}/",
+                headers=self._auth_headers(),
+            )
+            if status_code == 200:
+                return data
+            return None
+        except ClientError as e:
+            self.log.error(f"Failed to fetch user by telegram_id {telegram_user_id}: {e}")
+            return None
+
     async def complete_link(self, telegram_user_id: int, token: str) -> Optional[dict]:
         """Send a token to complete the user linking process."""
         try:

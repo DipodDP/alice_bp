@@ -38,47 +38,46 @@ async def get_time_interval(dialog_manager: DialogManager, **kwargs):
     }
 
 
-async def get_measurements_data(dialog_manager: DialogManager, **kwargs):
+async def get_measurements_data(dialog_manager: DialogManager, bp_api: BloodPressureApi, **kwargs):
     """Get pressure measurements data for the selected interval."""
-    # user_id = str(dialog_manager.event.from_user.id)
-    user_id = "3061B1EAC3BF4674E67B72A856541746353976E89416663FA35F5FF353B07FF6"
+    telegram_user_id = str(dialog_manager.event.from_user.id)
     selected_interval = dialog_manager.dialog_data.get("selected_interval", 0)
 
-    # Get config from middleware data
-    config = dialog_manager.middleware_data.get("config")
-    if not config:
-        logger.error("Config not found in middleware data")
-        return {
-            "measurements": [],
-            "total_count": 0,
-            "avg_systolic": 0,
-            "avg_diastolic": 0,
-            "avg_pulse": 0,
-            "has_data": False,
-            "period_label": get_period_label(selected_interval),
-            "start_date": "",
-            "end_date": "",
-            "error": "Configuration not available",
-        }
+    # Default error state
+    error_data = {
+        "measurements": [],
+        "total_count": 0,
+        "avg_systolic": 0,
+        "avg_diastolic": 0,
+        "avg_pulse": 0,
+        "has_data": False,
+        "period_label": get_period_label(selected_interval),
+        "start_date": "",
+        "end_date": "",
+    }
 
+    # Get alice_user_id from telegram_user_id
+    user_data = await bp_api.get_user_by_telegram_id(telegram_user_id)
+    if not user_data or not user_data.get("alice_user_id"):
+        logger.warning(f"User with telegram_id {telegram_user_id} is not linked.")
+        error_data["error"] = "Ваш аккаунт Telegram не связан с аккаунтом Алисы. Пожалуйста, используйте команду /link."
+        return error_data
+
+    alice_user_id = user_data["alice_user_id"]
     logger.info(
-        f"Getting pressure data for user {user_id}, interval: {selected_interval}"
+        f"Getting pressure data for user {alice_user_id} (tg_id: {telegram_user_id}), interval: {selected_interval}"
     )
 
     try:
-        api_client = BloodPressureApi(
-            base_url=config.django_api.base_url,
-            api_token=config.django_api.api_token,
-            proxy=config.tg_bot.proxy_url,
-        )
         # Calculate date range based on selected interval
         end_date = datetime.now(timezone.utc)
-        if selected_interval == 0:  # За неделю (last week)
+        if selected_interval == 0:  # За неделю (last 7 days)
             start_date = end_date - timedelta(days=7)
         elif selected_interval == 1:  # За прошлую неделю (previous week)
-            start_date = end_date - timedelta(days=14)
-            end_date = end_date - timedelta(days=7)
-        elif selected_interval == 2:  # За месяц (last month)
+            end_date_of_last_week = end_date - timedelta(days=end_date.weekday() + 1)
+            start_date = end_date_of_last_week - timedelta(days=6)
+            end_date = end_date_of_last_week
+        elif selected_interval == 2:  # За месяц (last 30 days)
             start_date = end_date - timedelta(days=30)
         else:
             start_date = end_date - timedelta(days=7)
@@ -88,52 +87,52 @@ async def get_measurements_data(dialog_manager: DialogManager, **kwargs):
         end_date_str = end_date.strftime("%Y-%m-%d")
 
         # Get measurements from Django API via infrastructure client
-        items = await api_client.get_measurements(
-            user_id=user_id, start_date=start_date_str, end_date=end_date_str
+        items = await bp_api.get_measurements(
+            user_id=alice_user_id, start_date=start_date_str, end_date=end_date_str
         )
 
-        # Filter measurements by date range
-        filtered_measurements = []
+        # The original code had a redundant date filter here. The API call already filters by date.
+        # We just need to process the items.
+        processed_measurements = []
         for item in items:
             try:
                 created_at: str = item.get("created_at", "")
                 dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                if start_date <= dt <= end_date:
-                    formatted_date = dt.strftime("%d.%m.%Y %H:%M")
-                    pulse = item.get("pulse")
-                    pulse_text = f", пульс {pulse}" if pulse else ""
-                    filtered_measurements.append(
-                        PressureMeasurement(
-                            systolic=item["systolic"],
-                            diastolic=item["diastolic"],
-                            pulse=pulse,
-                            created_at=created_at,
-                            formatted_date=formatted_date,
-                            pulse_text=pulse_text,
-                        )
+                formatted_date = dt.strftime("%d.%m.%Y %H:%M")
+                pulse = item.get("pulse")
+                pulse_text = f", пульс {pulse}" if pulse else ""
+                processed_measurements.append(
+                    PressureMeasurement(
+                        systolic=item["systolic"],
+                        diastolic=item["diastolic"],
+                        pulse=pulse,
+                        created_at=created_at,
+                        formatted_date=formatted_date,
+                        pulse_text=pulse_text,
                     )
+                )
             except Exception as e:
-                logger.warning(f"Error parsing date {item}: {e}")
+                logger.warning(f"Error parsing item {item}: {e}")
                 continue
 
         # Calculate statistics
-        if filtered_measurements:
-            avg_systolic = sum(m.systolic for m in filtered_measurements) / len(
-                filtered_measurements
+        if processed_measurements:
+            avg_systolic = sum(m.systolic for m in processed_measurements) / len(
+                processed_measurements
             )
-            avg_diastolic = sum(m.diastolic for m in filtered_measurements) / len(
-                filtered_measurements
+            avg_diastolic = sum(m.diastolic for m in processed_measurements) / len(
+                processed_measurements
             )
-            avg_pulse = None
             pulse_measurements = [
-                m.pulse for m in filtered_measurements if m.pulse is not None
+                m.pulse for m in processed_measurements if m.pulse is not None
             ]
+            avg_pulse = None
             if pulse_measurements:
                 avg_pulse = sum(pulse_measurements) / len(pulse_measurements)
 
             return {
-                "measurements": filtered_measurements,
-                "total_count": len(filtered_measurements),
+                "measurements": processed_measurements,
+                "total_count": len(processed_measurements),
                 "avg_systolic": round(avg_systolic, 1),
                 "avg_diastolic": round(avg_diastolic, 1),
                 "avg_pulse": round(avg_pulse, 1) if avg_pulse else None,
@@ -143,37 +142,18 @@ async def get_measurements_data(dialog_manager: DialogManager, **kwargs):
                 "end_date": end_date_str,
             }
         else:
+            # No measurements found for the period
             return {
-                "measurements": [],
-                "total_count": 0,
-                "avg_systolic": 0,
-                "avg_diastolic": 0,
-                "avg_pulse": 0,
+                **error_data,
                 "has_data": False,
-                "period_label": get_period_label(selected_interval),
                 "start_date": start_date_str,
                 "end_date": end_date_str,
             }
 
     except Exception as e:
         logger.error(f"Error fetching pressure data: {e}")
-        return {
-            "measurements": [],
-            "total_count": 0,
-            "avg_systolic": 0,
-            "avg_diastolic": 0,
-            "avg_pulse": 0,
-            "has_data": False,
-            "period_label": get_period_label(selected_interval),
-            "start_date": "",
-            "end_date": "",
-            "error": str(e),
-        }
-    finally:
-        try:
-            await api_client.close()
-        except Exception:
-            pass
+        error_data["error"] = str(e)
+        return error_data
 
 
 def get_period_label(interval: int) -> str:

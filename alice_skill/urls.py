@@ -6,6 +6,7 @@ from .views import (
     InitiateLinkView,
     LinkStatusView,
     UnlinkView,
+    UserByTelegramView,
     CompleteLinkView,
 )
 
@@ -18,5 +19,6 @@ urlpatterns = [
     path("api/v1/link/status/", LinkStatusView.as_view(), name="link-status"),
     path("api/v1/link/unlink/", UnlinkView.as_view(), name="link-unlink"),
     path("api/v1/link/complete/", CompleteLinkView.as_view(), name="link-complete"),
+    path("api/v1/users/by-telegram/<str:telegram_id>/", UserByTelegramView.as_view(), name="user-by-telegram"),
     path("", include(router.urls)),
 ]

@@ -1,5 +1,11 @@
 from rest_framework import serializers
-from .models import BloodPressureMeasurement
+from .models import BloodPressureMeasurement, User
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "alice_user_id", "telegram_user_id"]
 
 
 class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
