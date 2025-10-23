@@ -31,10 +31,6 @@ class BloodPressureApi(BaseClient):
         end_date: str,
         ordering: str = "-created_at",
     ) -> list[dict]:
-        """Fetch measurements list for user within date range.
-
-        Dates must be in YYYY-MM-DD format.
-        """
         try:
             _, data = await self._make_request(
                 method="GET",
@@ -100,25 +96,45 @@ class BloodPressureApi(BaseClient):
             self.log.error(f"Failed to fetch user by telegram_id {telegram_user_id}: {e}")
             return None
 
-    async def complete_link(self, telegram_user_id: int, token: str) -> Optional[dict]:
-        """Send a token to complete the user linking process."""
+
+    async def initiate_link(self, telegram_user_id: str) -> Optional[dict]:
+        """Initiate the linking process by requesting a code."""
         try:
             status_code, data = await self._make_request(
                 method="POST",
-                url="/api/v1/link/complete/",
+                url="/api/v1/link/generate-token/", # Updated URL
                 json={
-                    "telegram_user_id": str(telegram_user_id),
-                    "token": token
+                    "telegram_user_id": telegram_user_id # Updated parameter name
                 },
+                headers=self._auth_headers(),
+            )
+            if status_code == 201: # 201 Created for successful initiation
+                return data
+            self.log.error(
+                f"Failed to initiate link for user {telegram_user_id}. " # Updated log message
+                f"Status: {status_code}, Response: {data}"
+            )
+            return data
+        except ClientError as e:
+            self.log.error("Failed to initiate link: %s", e)
+            return None
+
+    async def unlink_account(self, telegram_user_id: str) -> Optional[dict]:
+        """Send a request to unlink the user's account."""
+        try:
+            status_code, data = await self._make_request(
+                method="POST",
+                url="/api/v1/link/unlink/",
+                json={"telegram_user_id": telegram_user_id},
                 headers=self._auth_headers(),
             )
             if status_code == 200:
                 return data
             self.log.error(
-                f"Failed to complete link for user {telegram_user_id}. "
+                f"Failed to unlink account for user {telegram_user_id}. "
                 f"Status: {status_code}, Response: {data}"
             )
-            return data  # Return error data as well
+            return data
         except ClientError as e:
-            self.log.error("Failed to complete link: %s", e)
+            self.log.error("Failed to unlink account: %s", e)
             return None

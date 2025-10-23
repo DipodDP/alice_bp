@@ -5,13 +5,15 @@ from aiogram.types import BotCommand, BotCommandScopeDefault
 DEF_COMMANDS = {
     'ru': [
         BotCommand(command='/start', description='Запустить бота'),
-        BotCommand(command='/help', description='Помощь по боту'),
-        BotCommand(command='/menu', description='Меню')
+        BotCommand(command='/link', description='Связать аккаунт'),
+        BotCommand(command='/unlink', description='Отвязать аккаунт'),
+        BotCommand(command='/help', description='Помощь по боту')
     ],
     'en': [
-        BotCommand(command='/start', description='Bot start'),
-        BotCommand(command='/help', description='Bot help'),
-        BotCommand(command='/menu', description='Menu')
+        BotCommand(command='/start', description='Start bot'),
+        BotCommand(command='/link', description='Link account'),
+        BotCommand(command='/unlink', description='Unlink account'),
+        BotCommand(command='/help', description='Bot help')
     ]
 }
 

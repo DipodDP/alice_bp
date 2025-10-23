@@ -96,8 +96,8 @@ async def get_measurements_data(dialog_manager: DialogManager, bp_api: BloodPres
         processed_measurements = []
         for item in items:
             try:
-                created_at: str = item.get("created_at", "")
-                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                measured_at: str = item.get("measured_at", "")
+                dt = datetime.fromisoformat(measured_at.replace("Z", "+00:00"))
                 formatted_date = dt.strftime("%d.%m.%Y %H:%M")
                 pulse = item.get("pulse")
                 pulse_text = f", пульс {pulse}" if pulse else ""
@@ -106,7 +106,7 @@ async def get_measurements_data(dialog_manager: DialogManager, bp_api: BloodPres
                         systolic=item["systolic"],
                         diastolic=item["diastolic"],
                         pulse=pulse,
-                        created_at=created_at,
+                        created_at=measured_at,
                         formatted_date=formatted_date,
                         pulse_text=pulse_text,
                     )

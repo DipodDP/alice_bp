@@ -47,7 +47,11 @@ class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BloodPressureMeasurement
-        fields = ["user_id", "systolic", "diastolic", "pulse", "created_at"]
+        fields = ["user_id", "systolic", "diastolic", "pulse", "measured_at"]
+
+
+class NLUObjectSerializer(serializers.Serializer):
+    tokens = serializers.ListField(child=serializers.CharField(), required=False, default=list())
 
 
 # --- Request Serializers ---
@@ -56,6 +60,7 @@ class RequestObjectSerializer(serializers.Serializer):
         allow_blank=True, required=False, default=""
     )
     command = serializers.CharField(allow_blank=True, required=False, default="")
+    nlu = NLUObjectSerializer(required=False) # Add nlu field
 
 
 class SessionObjectSerializer(serializers.Serializer):

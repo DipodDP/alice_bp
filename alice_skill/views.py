@@ -1,18 +1,14 @@
 import logging
-import hmac
-import secrets
-from datetime import timedelta
 
-from django.conf import settings
-from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .helpers import build_alice_response_payload
-from .models import BloodPressureMeasurement, User, LinkToken
-from .services import initiate_linking_process
+from .models import BloodPressureMeasurement, User
+from .permissions import IsBot
+from .services import generate_link_token, TooManyRequests
 from .serializers import (
     AliceRequestSerializer,
     AliceResponseSerializer,
@@ -27,17 +23,6 @@ from .handlers.last_measurement import LastMeasurementHandler
 logger = logging.getLogger(__name__)
 
 
-# Placeholder authenticators
-def validate_alice_signature(request_body, headers):
-    """Placeholder for Yandex.Dialogs signature validation."""
-    return True
-
-
-def validate_telegram_bot_request(headers):
-    """Placeholder for Telegram bot request validation."""
-    return True
-
-
 class AliceWebhookView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -50,7 +35,7 @@ class AliceWebhookView(APIView):
     ]
 
     def post(self, request):
-        logger.info(f"Incoming request: {request.data}")
+        logger.debug(f"Incoming request: {request.data}")
         request_serializer = AliceRequestSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         validated_request = request_serializer.validated_data
@@ -78,27 +63,8 @@ class AliceWebhookView(APIView):
 
 
 class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
-    queryset = BloodPressureMeasurement.objects.all().order_by("-created_at")
+    queryset = BloodPressureMeasurement.objects.all().order_by("-measured_at")
     serializer_class = BloodPressureMeasurementSerializer
-
-
-class InitiateLinkView(APIView):
-    """
-    Handles the first step of the linking process, initiated by Alice.
-    """
-    permission_classes = [AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        alice_user_id = request.data.get("session", {}).get("user_id")
-        if not alice_user_id:
-            return Response({"status": "error", "message": "user_id is missing"}, status=status.HTTP_400_BAD_REQUEST)
-
-        success, message = initiate_linking_process(alice_user_id)
-
-        if success:
-            return Response({"status": "success", "message": message}, status=status.HTTP_201_CREATED)
-        else:
-            return Response({"status": "error", "message": message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LinkStatusView(APIView):
@@ -151,53 +117,11 @@ class UnlinkView(APIView):
             return Response({"status": "not_linked", "message": "Аккаунты не были связаны."}, status=status.HTTP_200_OK)
 
 
-class CompleteLinkView(APIView):
-    """
-    Handles the second step, completing the link from Telegram.
-    Validates the one-time code and links the accounts.
-    """
-    permission_classes = [AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        telegram_user_id = request.data.get("telegram_user_id")
-        token = request.data.get("token")
-
-        if not telegram_user_id or not token:
-            return Response({"status": "error", "message": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
-
-        raw_token = token.replace("-", "").upper()
-        token_hash = hmac.new(
-            settings.SECRET_KEY.encode(),
-            raw_token.encode(),
-            'sha256'
-        ).hexdigest()
-
-        try:
-            link_token = LinkToken.objects.select_related('user').get(token_hash=token_hash)
-        except LinkToken.DoesNotExist:
-            return Response({"status": "error", "message": "Неверный код или срок его действия истек."}, status=status.HTTP_404_NOT_FOUND)
-
-        if link_token.expires_at < timezone.now():
-            link_token.delete()
-            return Response({"status": "error", "message": "Неверный код или срок его действия истек."}, status=status.HTTP_410_GONE)
-
-        user = link_token.user
-
-        User.objects.filter(telegram_user_id=telegram_user_id).exclude(id=user.id).update(telegram_user_id=None)
-
-        user.telegram_user_id = telegram_user_id
-        user.save()
-
-        link_token.delete()
-
-        return Response({"status": "success", "message": "Аккаунты успешно связаны!"}, status=status.HTTP_200_OK)
-
-
 class UserByTelegramView(APIView):
     """
     Retrieves a user by their Telegram ID.
     """
-    permission_classes = [AllowAny]  # In production, should be protected
+    permission_classes = [IsBot]  # In production, should be protected
 
     def get(self, request, telegram_id, *args, **kwargs):
         try:
@@ -206,3 +130,30 @@ class UserByTelegramView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"status": "error", "message": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class GenerateLinkTokenView(APIView):
+    """
+    Generates a linking token for a Telegram user.
+    """
+    permission_classes = [IsBot] # TODO: Add proper authentication for Telegram bot
+
+    def post(self, request, *args, **kwargs):
+        telegram_user_id = request.data.get("telegram_user_id")
+        if not telegram_user_id:
+            return Response({"status": "error", "message": "telegram_user_id is missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Ensure telegram_user_id is an integer
+            telegram_user_id = int(telegram_user_id)
+        except ValueError:
+            return Response({"status": "error", "message": "Invalid telegram_user_id format"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            plaintext_token = generate_link_token(telegram_user_id=telegram_user_id)
+            return Response({"status": "success", "token": plaintext_token, "message": "Token generated successfully"}, status=status.HTTP_201_CREATED)
+        except TooManyRequests as e:
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        except Exception as e:
+            logger.exception("Error generating link token")
+            return Response({"status": "error", "message": "Failed to generate token"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

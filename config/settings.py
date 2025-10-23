@@ -22,6 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-g!vb&)u#oa-zlerg68nyo(esv4^j(_=rtwd9ktf14=ken0#q_('
 
+API_TOKEN = 'test-token'
+LINK_SECRET = 'a-super-secret-key'
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -137,7 +140,7 @@ LOGGING = {
             "formatter": "verbose",
         },
         "console": {
-            "level": "INFO",
+            "level": "DEBUG",
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
@@ -154,10 +157,10 @@ LOGGING = {
             "level": "INFO",
             "propagate": True,
         },
-        "alisa_skill": {
-            "handlers": ["file", "console"],
+        "alice_skill": {
+            "handlers": ["console"],
             "level": "DEBUG",
-            "propagate": True,
+            "propagate": False,
         },
     },
 }
@@ -165,3 +168,5 @@ LOGGING = {
 SITE_URL = "https://your-domain.com"
 STARTUP_PATH = "/background/start"
 STARTUP_INTERVAL = 60 * 30
+
+ALICE_BOT_USERNAME = "AliceBPBot" # Placeholder for the bot's username

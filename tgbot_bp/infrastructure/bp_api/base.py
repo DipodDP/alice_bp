@@ -73,7 +73,7 @@ class BaseClient:
                 proxy=self._proxy,
             ) as response:
                 status = response.status
-                if status != 200:
+                if status >= 500:
                     s = await response.text()
                     raise ClientError(f"Got status {status} for {method} {url}: {s}")
                 try:

@@ -31,7 +31,7 @@ class LastMeasurementHandler(BaseAliceHandler):
             return "Записей пока нет."
         last = (
             BloodPressureMeasurement.objects.filter(user_id=user_id)
-            .order_by("-created_at")
+            .order_by("-measured_at")
             .first()
         )
         if not last:
@@ -43,7 +43,7 @@ class LastMeasurementHandler(BaseAliceHandler):
         reply = f"Последняя запись: {data['systolic']}/{data['diastolic']}"
         if data.get("pulse"):
             reply += f", пульс {data['pulse']}"
-        reply += f" (создано {data['created_at']})"
+        reply += f" (создано {data['measured_at']})"
 
         logger.info(
             f"LastMeasurementHandler: Returning measurement: {data['systolic']}/{data['diastolic']}"

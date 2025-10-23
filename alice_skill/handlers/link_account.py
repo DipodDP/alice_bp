@@ -1,5 +1,4 @@
-from ..services import initiate_linking_process
-
+from ..services import match_webhook_to_telegram_user
 
 class LinkAccountHandler:
     TRIGGERS = ["связать аккаунт", "привязать телеграм", "свяжи аккаунт", "привяжи телеграм"]
@@ -12,8 +11,11 @@ class LinkAccountHandler:
             if not alice_user_id:
                 return "Не могу определить ваш идентификатор. Пожалуйста, попробуйте еще раз."
 
-            # Call the service function to get the message
-            success, message = initiate_linking_process(alice_user_id)
-            return message
+            # Attempt to match the webhook to a Telegram user
+            matched_telegram_user_id = match_webhook_to_telegram_user(request)
 
+            if matched_telegram_user_id:
+                return "Аккаунты успешно связаны!"
+            else:
+                return "Не удалось связать аккаунты. Проверьте код или попробуйте получить новый."
         return None
