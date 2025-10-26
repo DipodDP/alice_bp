@@ -1,19 +1,12 @@
-from enum import Enum
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
-
-
-class ReplyButtons(str, Enum):
-    BTN_GET_REPORT = "🧾 Отправить отчет"
-    SEND_MENU = '🧾 Show Menu'
-    RESERVATION = '🍽 Make Reservation'
-
-
-class NavButtons(str, Enum):
-    BTN_NEXT = "➡️ Дальше"
-    BTN_BACK = "↩️ Назад"
-    BTN_SEND = "➡️ Отправить"
-    BTN_CANCEL = "❌ Отменить"
-    BTN_OK = "🆗"
+from tgbot.messages.keyboards_msg import (
+    ReplyButtons, 
+    NavButtons, 
+    PLACEHOLDER_PRESS_BUTTON, 
+    PLACEHOLDER_PRESS_CANCEL, 
+    PLACEHOLDER_PRESS_OK, 
+    PLACEHOLDER_ENTER_RESPONSE
+)
 
 
 def user_menu_keyboard():
@@ -21,7 +14,7 @@ def user_menu_keyboard():
     keyboard.button(text=ReplyButtons.BTN_GET_REPORT)
     keyboard.adjust()
     return keyboard.as_markup(
-        input_field_placeholder=f"Нажмите на кнопку {ReplyButtons.BTN_GET_REPORT.value}",
+        input_field_placeholder=PLACEHOLDER_PRESS_BUTTON.format(button_text=ReplyButtons.BTN_GET_REPORT),
         one_time_keyboard=True,
         resize_keyboard=True,
     )
@@ -32,7 +25,7 @@ def cancel_keyboard():
     keyboard.button(text=NavButtons.BTN_CANCEL)
     keyboard.adjust(1, 2)
     return keyboard.as_markup(
-        input_field_placeholder=f"Нажмите {NavButtons.BTN_CANCEL.value} для отмены",
+        input_field_placeholder=PLACEHOLDER_PRESS_CANCEL.format(button_text=NavButtons.BTN_CANCEL),
         resize_keyboard=True,
     )
 
@@ -42,7 +35,7 @@ def ok_keyboard():
     keyboard.button(text=NavButtons.BTN_OK)
     keyboard.adjust()
     return keyboard.as_markup(
-        input_field_placeholder=f"Нажмите {NavButtons.BTN_OK.value}",
+        input_field_placeholder=PLACEHOLDER_PRESS_OK.format(button_text=NavButtons.BTN_OK),
         resize_keyboard=True,
     )
 
@@ -53,5 +46,5 @@ def nav_keyboard():
     keyboard.button(text=NavButtons.BTN_CANCEL)
     keyboard.adjust(2)
     return keyboard.as_markup(
-        input_field_placeholder="Введите ответ...", resize_keyboard=True
+        input_field_placeholder=PLACEHOLDER_ENTER_RESPONSE, resize_keyboard=True
     )

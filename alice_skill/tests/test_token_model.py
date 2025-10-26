@@ -27,15 +27,15 @@ class AccountLinkTokenModelTest(TestCase):
         """
         Tests that generate_link_token returns a plaintext token and stores a hashed record.
         """
-        mock_system_random.return_value.sample.return_value = ["код", "хрен", "лайм", "розмарин"]
+        mock_system_random.return_value.choice.return_value = "мост"
+        mock_system_random.return_value.randint.return_value = 627
         mock_hmac_new.return_value.hexdigest.return_value = "hashedtoken123"
 
         telegram_user_id = 12345
-        token_length = 4
 
-        plaintext_token = generate_link_token(telegram_user_id, length=token_length)
+        plaintext_token = generate_link_token(telegram_user_id)
 
-        self.assertEqual(plaintext_token, "код хрен лайм розмарин")
+        self.assertEqual(plaintext_token, "мост-627")
 
         # Check that a record was created in the database
         self.assertEqual(AccountLinkToken.objects.count(), 1)
@@ -55,18 +55,14 @@ class AccountLinkTokenModelTest(TestCase):
         and that simultaneous requests yield distinct tokens.
         """
         mock_hmac_new.return_value.hexdigest.side_effect = ["hash1", "hash2", "hash3"]
-        mock_system_random.return_value.sample.side_effect = [
-            ["word1", "word2"], # First token
-            ["word3", "word4"], # Second token
-            ["word5", "word6"], # Third token for rate limit
-        ]
+        mock_system_random.return_value.choice.side_effect = ["word1", "word3", "word5"]
+        mock_system_random.return_value.randint.side_effect = [123, 456, 789]
 
         telegram_user_id = 67890
-        token_length = 2
 
         # First token generation should succeed
-        token1 = generate_link_token(telegram_user_id, length=token_length)
-        self.assertEqual(token1, "word1 word2")
+        token1 = generate_link_token(telegram_user_id)
+        self.assertEqual(token1, "word1-123")
         self.assertEqual(AccountLinkToken.objects.count(), 1)
 
         # Simulate time passing, but not enough for rate limit reset
@@ -74,4 +70,4 @@ class AccountLinkTokenModelTest(TestCase):
             mock_now.return_value = timezone.make_aware(timezone.datetime(2025, 10, 22, 10, 0, 0)) + timedelta(seconds=5)
             # Second token generation for the same user should raise TooManyRequests
             with self.assertRaises(TooManyRequests):
-                generate_link_token(telegram_user_id, length=token_length)
+                generate_link_token(telegram_user_id)

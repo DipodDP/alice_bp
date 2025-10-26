@@ -1,7 +1,6 @@
 import logging
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-from aiogram.utils.formatting import as_key_value, as_marked_list, as_section
 from aiogram_dialog import DialogManager
 from aiogram_dialog.widgets.kbd import Button, Select
 

@@ -1,22 +1,26 @@
+import logging
+import re
 import secrets
 import hmac
-import string
 import itertools
+from . import messages
 from .models import User, AccountLinkToken
 from .wordlist import WORDLIST
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 
+logger = logging.getLogger(__name__)
+
 class TooManyRequests(Exception):
     pass
 
 RATE_LIMIT_SECONDS = 60 # 1 minute rate limit for token generation
 
-def generate_link_token(telegram_user_id: int, length: int = 4) -> str:
+def generate_link_token(telegram_user_id: int) -> str:
     """
-    Generates a unique plaintext token, stores its hash in the database, and returns the plaintext token.
-    The token consists of `length` words from a predefined wordlist.
+    Generates a unique plaintext token in the format "word-number", stores its hash in the database, and returns the plaintext token.
+    The token consists of a random word from a predefined wordlist and a random 3-digit number.
     """
 
     # Check for rate limiting
@@ -25,14 +29,17 @@ def generate_link_token(telegram_user_id: int, length: int = 4) -> str:
     ).order_by('-created_at').first()
 
     if last_token and (timezone.now() - last_token.created_at).total_seconds() < RATE_LIMIT_SECONDS:
-        raise TooManyRequests("Too many token generation requests for this user.")
+        raise TooManyRequests(messages.ServiceMessages.RATE_LIMIT_ERROR)
 
-    # Generate a token phrase from the wordlist
-    token_words = secrets.SystemRandom().sample(WORDLIST, k=length)
-    plaintext_token = " ".join(token_words)
+    # Generate a random word from the wordlist
+    random_word = secrets.SystemRandom().choice(WORDLIST)
+    # Generate a random 3-digit number
+    random_number = secrets.SystemRandom().randint(100, 999)
 
-    # Normalize the token for hashing (lowercase, join with single space, sorted words)
-    normalized_token = " ".join(sorted(token_words)).lower()
+    plaintext_token = f"{random_word}-{random_number}"
+
+    # Normalize the token for hashing (lowercase)
+    normalized_token = plaintext_token.lower()
 
     # Hash the token for storage
     token_hash = hmac.new(
@@ -40,7 +47,6 @@ def generate_link_token(telegram_user_id: int, length: int = 4) -> str:
         normalized_token.encode(),
         'sha256'
     ).hexdigest()
-    print(f"DEBUG: generate_link_token saving token_hash: {token_hash}")
 
     expires_at = timezone.now() + timedelta(minutes=10) # Configurable lifetime
 
@@ -48,11 +54,9 @@ def generate_link_token(telegram_user_id: int, length: int = 4) -> str:
     AccountLinkToken.objects.create(
         token_hash=token_hash,
         telegram_user_id=telegram_user_id,
-        token_word_count=length,
         expires_at=expires_at,
         used=False
     )
-    created_token = AccountLinkToken.objects.get(token_hash=token_hash)
 
     return plaintext_token
 
@@ -71,11 +75,23 @@ def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
     if not nlu_tokens:
         return None
     
-    # Normalize NLU tokens: lowercase and remove punctuation
-    normalized_nlu_tokens = [
-        word.lower().strip(string.punctuation) for word in nlu_tokens
-    ]
-    normalized_nlu_tokens = [word for word in normalized_nlu_tokens if word] # Remove empty strings
+    # Normalize NLU tokens
+    normalized_nlu_tokens = []
+    for token in nlu_tokens:
+        word = token.lower()
+        word = word.replace('ё', 'е')
+        word = word.replace('a', 'а').replace('e', 'е').replace('o', 'о').replace('p', 'р').replace('c', 'с').replace('x', 'х').replace('y', 'у')
+        
+        # Keep the original token if it matches the word-number pattern
+        if re.match(r'^[а-яё]+-\d{3}$', word):
+            normalized_nlu_tokens.append(word)
+        elif word.isdigit(): # Keep purely numeric tokens
+            normalized_nlu_tokens.append(word)
+        else:
+            # Otherwise, remove non-Cyrillic characters and append if not empty
+            cleaned_word = re.sub(r'[^а-я]', '', word)
+            if cleaned_word:
+                normalized_nlu_tokens.append(cleaned_word)
 
     current_time = timezone.now()
     active_tokens = AccountLinkToken.objects.filter(
@@ -84,30 +100,43 @@ def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
     )
 
     for account_link_token in active_tokens:
-        expected_word_count = account_link_token.token_word_count
+        for i, nlu_token in enumerate(normalized_nlu_tokens):
+            candidate_token_phrase = None
+            # Check if the current token is a word from our wordlist
+            if nlu_token in WORDLIST:
+                # Look for a number immediately following the word
+                if i + 1 < len(normalized_nlu_tokens) and normalized_nlu_tokens[i+1].isdigit():
+                    candidate_token_phrase = f"{nlu_token}-{normalized_nlu_tokens[i+1]}"
+                # If the word itself is the token (e.g., 'горох-882' was not split)
+                elif re.match(r'^[а-яё]+-\d{3}$', nlu_token):
+                    candidate_token_phrase = nlu_token
+            # If the token is already in 'word-number' format
+            elif re.match(r'^[а-яё]+-\d{3}$', nlu_token):
+                candidate_token_phrase = nlu_token
+            
+            if candidate_token_phrase:
+                candidate_token_hash = hmac.new(
+                    settings.LINK_SECRET.encode(),
+                    candidate_token_phrase.encode(),
+                    'sha256'
+                ).hexdigest()
 
-        # Generate combinations of NLU tokens that match the expected word count
-        # Use combinations and sort the words within each combination to ensure order does not matter for hashing
-        for combo in itertools.combinations(normalized_nlu_tokens, expected_word_count):
-            candidate_token_phrase = " ".join(sorted(combo)) # Sort for consistent hashing
-            candidate_token_hash = hmac.new(
-                settings.LINK_SECRET.encode(),
-                candidate_token_phrase.encode(),
-                'sha256'
-            ).hexdigest()
+                if candidate_token_hash == account_link_token.token_hash:
+                    # Found a match!
+                    account_link_token.used = True
+                    account_link_token.save()
 
-            if candidate_token_hash == account_link_token.token_hash:
-                # Found a match!
-                account_link_token.used = True
-                account_link_token.save()
+                    telegram_user_id_str = str(account_link_token.telegram_user_id)
 
-                # Find or create User and link Alice ID
-                user, created = User.objects.get_or_create(
-                    telegram_user_id=account_link_token.telegram_user_id
-                )
-                user.alice_user_id = alice_user_id
-                user.save()
+                    # Find or create the user based on the Alice ID
+                    user, created = User.objects.get_or_create(alice_user_id=alice_user_id)
 
-                return account_link_token.telegram_user_id
+                    # Clear any existing user's telegram_user_id if it matches the new one
+                    User.objects.filter(telegram_user_id=telegram_user_id_str).exclude(pk=user.pk).update(telegram_user_id=None)
+
+                    user.telegram_user_id = telegram_user_id_str
+                    user.save()
+
+                    return account_link_token.telegram_user_id
 
     return None

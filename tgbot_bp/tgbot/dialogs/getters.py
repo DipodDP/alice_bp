@@ -5,6 +5,7 @@ from typing import Any  # noqa: F401 (imported for potential future annotations)
 
 from aiogram_dialog import DialogManager
 from infrastructure.bp_api.api import BloodPressureApi
+from tgbot.messages.dialogs_msg import UserDialogMessages
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ async def get_measurements_data(dialog_manager: DialogManager, bp_api: BloodPres
     user_data = await bp_api.get_user_by_telegram_id(telegram_user_id)
     if not user_data or not user_data.get("alice_user_id"):
         logger.warning(f"User with telegram_id {telegram_user_id} is not linked.")
-        error_data["error"] = "Ваш аккаунт Telegram не связан с аккаунтом Алисы. Пожалуйста, используйте команду /link."
+        error_data["error"] = UserDialogMessages.ACCOUNT_NOT_LINKED_ERROR
         return error_data
 
     alice_user_id = user_data["alice_user_id"]
@@ -142,7 +143,9 @@ async def get_measurements_data(dialog_manager: DialogManager, bp_api: BloodPres
                 "end_date": end_date_str,
             }
         else:
-            # No measurements found for the period
+            # No measurements found for the period or all failed to parse
+            if items:
+                error_data["error"] = UserDialogMessages.MEASUREMENT_PROCESSING_ERROR
             return {
                 **error_data,
                 "has_data": False,

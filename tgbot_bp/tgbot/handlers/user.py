@@ -17,7 +17,7 @@ async def process_unlink_command(message: Message, bp_api: BloodPressureApi):
     Handler for the /unlink command. Unlinks the user's account.
     """
     if not message.from_user:
-        await message.answer("Не могу определить ваш профиль.")
+        await message.answer(UserHandlerMessages.CANT_IDENTIFY_PROFILE)
         return
 
     telegram_user_id = str(message.from_user.id)
@@ -35,7 +35,7 @@ async def user_start(message: Message, dialog_manager: DialogManager):
     Handler for the /start command. Sends a greeting and starts the main dialog.
     """
     if not message.from_user:
-        await message.answer("Не могу определить ваш профиль.")
+        await message.answer(UserHandlerMessages.CANT_IDENTIFY_PROFILE)
         return
 
     bp_api: BloodPressureApi = dialog_manager.middleware_data["bp_api"]
@@ -57,7 +57,7 @@ async def process_link_command(message: Message, bp_api: BloodPressureApi):
     Handler for the /link command. Initiates linking.
     """
     if not message.from_user:
-        await message.answer("Не могу определить ваш профиль.")
+        await message.answer(UserHandlerMessages.CANT_IDENTIFY_PROFILE)
         return
 
     telegram_chat_id = str(message.from_user.id)
@@ -67,11 +67,7 @@ async def process_link_command(message: Message, bp_api: BloodPressureApi):
     if response and response.get("status") == "success":
         token = response.get("token")
         if token:
-            instruction_message = (
-                f"Ваш код для связывания: {token}. "
-                f"Скажите Алисе: 'свяжи аккаунт' и назовите код."
-            )
-            await message.answer(instruction_message)
+            await message.answer(UserHandlerMessages.LINK_INITIATE_SUCCESS.format(token=token))
         else:
             await message.answer(UserHandlerMessages.LINK_INITIATE_ERROR)
     elif response and response.get("message"):

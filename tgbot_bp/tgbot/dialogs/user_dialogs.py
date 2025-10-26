@@ -73,7 +73,7 @@ user_menu_dialog = Dialog(
             Format(UserDialogMessages.PRESSURE_AVERAGE_WITH_PULSE),
             Format(UserDialogMessages.PRESSURE_MEASUREMENTS_COUNT),
             Const(""),
-            Const("📋 Последние измерения:"),
+            Const(UserDialogMessages.LAST_MEASUREMENTS_TITLE),
             sep="\n",
         ),
         ScrollingGroup(

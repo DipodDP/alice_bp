@@ -5,6 +5,7 @@ from django.utils import timezone
 class User(models.Model):
     alice_user_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     telegram_user_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    timezone = models.CharField(max_length=50, default='UTC')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -17,7 +18,7 @@ class BloodPressureMeasurement(models.Model):
     systolic = models.IntegerField()
     diastolic = models.IntegerField()
     pulse = models.IntegerField(null=True, blank=True)
-    measured_at = models.DateTimeField(auto_now_add=True)
+    measured_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         ordering = ['-measured_at']
@@ -29,7 +30,6 @@ class BloodPressureMeasurement(models.Model):
 class AccountLinkToken(models.Model):
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
     telegram_user_id = models.BigIntegerField(db_index=True)
-    token_word_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     used = models.BooleanField(default=False)
