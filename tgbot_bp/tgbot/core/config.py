@@ -113,8 +113,8 @@ class DjangoApiConfig:
         """
         Creates the DjangoApiConfig object from environment variables.
         """
-        base_url = env.str("DJANGO_API_BASE_URL", default="http://localhost:8000")
-        api_token = env.str("DJANGO_API_TOKEN", default=None)
+        base_url = env.str("API_BASE_URL", default="http://localhost:8000")
+        api_token = env.str("API_TOKEN", default=None)
 
         return DjangoApiConfig(
             base_url=base_url,
