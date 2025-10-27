@@ -1,8 +1,9 @@
 from enum import StrEnum
+from django.conf import settings
 
 
 class HandlerMessages(StrEnum):
-    GREETING = "Здравствуйте! Скажите давление, например: 120 на 80."
+    GREETING = "Здравствуйте! Скажите давление."
     ERROR_UNPARSED = "Не удалось распознать цифры давления или команду. Попробуйте сказать, например, 'давление 120 на 80'."
 
 
@@ -16,6 +17,7 @@ class LinkAccountMessages(StrEnum):
     NO_ID = "Не могу определить ваш идентификатор. Пожалуйста, попробуйте еще раз."
     SUCCESS = "Аккаунты успешно связаны!"
     FAIL = "Не удалось связать аккаунты. Проверьте код или попробуйте получить новый."
+    ACCOUNT_LINKING_INSTRUCTIONS = f"Чтобы привязать аккаунт, перейдите в Telegram, найдите бота @{settings.ALICE_BOT_USERNAME} и получите код следуя инструкциям."
 
 
 class RecordPressureMessages(StrEnum):

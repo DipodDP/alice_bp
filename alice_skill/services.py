@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 class TooManyRequests(Exception):
     pass
 
+class TokenAlreadyUsed(Exception):
+    pass
+
 RATE_LIMIT_SECONDS = 60 # 1 minute rate limit for token generation
 
 def generate_link_token(telegram_user_id: int) -> str:
@@ -78,41 +81,52 @@ def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
     # Normalize NLU tokens
     normalized_nlu_tokens = []
     for token in nlu_tokens:
-        word = token.lower()
-        word = word.replace('ё', 'е')
-        word = word.replace('a', 'а').replace('e', 'е').replace('o', 'о').replace('p', 'р').replace('c', 'с').replace('x', 'х').replace('y', 'у')
-        
-        # Keep the original token if it matches the word-number pattern
-        if re.match(r'^[а-яё]+-\d{3}$', word):
-            normalized_nlu_tokens.append(word)
-        elif word.isdigit(): # Keep purely numeric tokens
-            normalized_nlu_tokens.append(word)
-        else:
-            # Otherwise, remove non-Cyrillic characters and append if not empty
-            cleaned_word = re.sub(r'[^а-я]', '', word)
-            if cleaned_word:
-                normalized_nlu_tokens.append(cleaned_word)
+        # Split tokens by space to handle cases like "инжир 788"
+        sub_tokens = token.split(' ')
+        for sub_token in sub_tokens:
+            word = sub_token.lower()
+            word = word.replace('ё', 'е')
+            word = word.replace('a', 'а').replace('e', 'е').replace('o', 'о').replace('p', 'р').replace('c', 'с').replace('x', 'х').replace('y', 'у')
+            
+            # Keep the original token if it matches the word-number pattern
+            if re.match(r'^[а-яё]+-\d{3}$', word):
+                normalized_nlu_tokens.append(word)
+            elif word.isdigit(): # Keep purely numeric tokens
+                normalized_nlu_tokens.append(word)
+            else:
+                # Otherwise, remove non-Cyrillic characters and append if not empty
+                cleaned_word = re.sub(r'[^а-я]', '', word)
+                if cleaned_word:
+                    normalized_nlu_tokens.append(cleaned_word)
 
     current_time = timezone.now()
-    active_tokens = AccountLinkToken.objects.filter(
-        used=False,
+    all_tokens = AccountLinkToken.objects.filter(
         expires_at__gt=current_time
     )
 
-    for account_link_token in active_tokens:
+    for account_link_token in all_tokens:
         for i, nlu_token in enumerate(normalized_nlu_tokens):
             candidate_token_phrase = None
             # Check if the current token is a word from our wordlist
             if nlu_token in WORDLIST:
-                # Look for a number immediately following the word
-                if i + 1 < len(normalized_nlu_tokens) and normalized_nlu_tokens[i+1].isdigit():
-                    candidate_token_phrase = f"{nlu_token}-{normalized_nlu_tokens[i+1]}"
+                # Look for a three-digit number immediately following the word, potentially split into individual digits
+                if i + 3 < len(normalized_nlu_tokens) and \
+                   normalized_nlu_tokens[i+1].isdigit() and \
+                   normalized_nlu_tokens[i+2].isdigit() and \
+                   normalized_nlu_tokens[i+3].isdigit():
+                    combined_number = f"{normalized_nlu_tokens[i+1]}{normalized_nlu_tokens[i+2]}{normalized_nlu_tokens[i+3]}"
+                    if len(combined_number) == 3:
+                        candidate_token_phrase = f"{nlu_token}-{combined_number}"
+                elif i + 1 < len(normalized_nlu_tokens) and normalized_nlu_tokens[i+1].isdigit():
+                    # This handles cases where the number is a single token, e.g., "слово-123"
+                    if len(normalized_nlu_tokens[i+1]) == 3:
+                        candidate_token_phrase = f"{nlu_token}-{normalized_nlu_tokens[i+1]}"
                 # If the word itself is the token (e.g., 'горох-882' was not split)
                 elif re.match(r'^[а-яё]+-\d{3}$', nlu_token):
                     candidate_token_phrase = nlu_token
-            # If the token is already in 'word-number' format
-            elif re.match(r'^[а-яё]+-\d{3}$', nlu_token):
-                candidate_token_phrase = nlu_token
+            # If the token is already in 'word-number' format or 'word number' format
+            elif re.match(r'^[а-яё]+[ -]\d{3}$', nlu_token):
+                candidate_token_phrase = nlu_token.replace(' ', '-')
             
             if candidate_token_phrase:
                 candidate_token_hash = hmac.new(
@@ -123,6 +137,9 @@ def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
 
                 if candidate_token_hash == account_link_token.token_hash:
                     # Found a match!
+                    if account_link_token.used:
+                        raise TokenAlreadyUsed
+
                     account_link_token.used = True
                     account_link_token.save()
 

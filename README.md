@@ -26,10 +26,43 @@ This project allows users to link their Yandex.Alice account with their Telegram
 
 ### Alice
 
-*   **"Свяжи аккаунт"** - Complete the account linking process using the code from Telegram.
+*   **"Свяжи аккаунт <КОД>"** - Complete the account linking process using the code from Telegram (e.g., "Свяжи аккаунт мост-627").
 *   **"Запомни давление 120 на 80"** - Record a new blood pressure measurement.
 *   **"Покажи последнее давление"** - View your last recorded measurement.
 *   **"Отвяжи аккаунт"** - Unlink your Alice and Telegram accounts.
+
+## API Endpoints
+
+### Alice Skill Endpoints
+
+*   `POST /alice_webhook/`: Receives and processes webhook requests from Yandex.Alice.
+*   `GET /api/v1/link/status/`: Checks the linking status of Alice and Telegram accounts.
+*   `POST /api/v1/link/unlink/`: Unlinks Alice and Telegram accounts.
+*   `GET /api/v1/users/by-telegram/<str:telegram_id>/`: Retrieves user information by Telegram ID.
+*   `POST /api/v1/link/generate-token/`: Generates a one-time token for account linking.
+*   `GET /api/v1/measurements/`: Retrieves a list of blood pressure measurements.
+*   `POST /api/v1/measurements/`: Records a new blood pressure measurement.
+*   `GET /api/v1/measurements/<id>/`: Retrieves a specific blood pressure measurement by ID.
+*   `PUT /api/v1/measurements/<id>/`: Updates a specific blood pressure measurement by ID.
+*   `PATCH /api/v1/measurements/<id>/`: Partially updates a specific blood pressure measurement by ID.
+*   `DELETE /api/v1/measurements/<id>/`: Deletes a specific blood pressure measurement by ID.
+
+### Python Anywhere Background Endpoints
+
+*   `GET /background/`: Provides a status page for the external bot subprocess.
+*   `GET /background/start/`: Starts the external bot subprocess.
+*   `POST /webhook/`: Proxies incoming webhook requests to the local bot server.
+
+### Telegram Bot API Endpoints (Consumed)
+
+The Telegram bot consumes the following endpoints from the Alice Skill API:
+
+*   `GET /api/v1/measurements/`: Retrieves blood pressure measurements (for last week's report and last measurement).
+*   `GET /api/v1/users/by-telegram/<str:telegram_id>/`: Retrieves user information by Telegram ID to check linking status.
+*   `POST /api/v1/link/generate-token/`: Generates a one-time token for account linking.
+*   `POST /api/v1/link/unlink/`: Unlinks Alice and Telegram accounts.
+
+For full details on these endpoints, refer to the "Alice Skill Endpoints" section.
 
 ## Getting Started
 
@@ -47,15 +80,14 @@ This project allows users to link their Yandex.Alice account with their Telegram
     ```
 2.  Install the dependencies:
     ```bash
-    pip install -r requirements.txt
-    ```
-3.  Set up the database:
+    uv sync --all-packages
+    ```3.  Set up the database:
     ```bash
-    python manage.py migrate
+    uv run manage.py migrate
     ```
 4.  Run the development server:
     ```bash
-    python manage.py runserver
+    uv run manage.py runserver
     ```
 
 ## Testing
@@ -63,5 +95,5 @@ This project allows users to link their Yandex.Alice account with their Telegram
 To run the tests, use the following command:
 
 ```bash
-python manage.py test
+uv run manage.py test
 ```

@@ -4,8 +4,10 @@ import hmac
 import hashlib
 from datetime import timedelta
 from django.utils import timezone
-from ..messages import LinkAccountMessages
+from ..messages import LinkAccountMessages, HandlerMessages
 from ..models import AccountLinkToken, User
+from ..wordlist import WORDLIST
+import secrets
 
 # Mock settings for testing
 
@@ -23,6 +25,29 @@ def create_token_hash(secret):
         ).hexdigest()
 
     return _create_token_hash
+
+
+@pytest.fixture
+def create_word_number_token(secret):
+    def _create_word_number_token(telegram_user_id, expires_in_minutes=10, used=False):
+        random_word = secrets.SystemRandom().choice(WORDLIST)
+        random_number = secrets.SystemRandom().randint(100, 999)
+        plaintext_token = f"{random_word}-{random_number}"
+        normalized_token = plaintext_token.lower()
+        token_hash = hmac.new(
+            secret.encode(),
+            normalized_token.encode(),
+            'sha256'
+        ).hexdigest()
+        expires_at = timezone.now() + timedelta(minutes=expires_in_minutes)
+        account_link_token = AccountLinkToken.objects.create(
+            token_hash=token_hash,
+            telegram_user_id=telegram_user_id,
+            expires_at=expires_at,
+            used=used
+        )
+        return plaintext_token, account_link_token
+    return _create_word_number_token
 
 
 @pytest.fixture
@@ -58,30 +83,21 @@ def alice_webhook_payload(session_id="test-session", message_id=1, user_id="test
     return _payload
 
 
-# Iteration 0 - Smoke Tests (failing)
 
 
-def test_smoke_valid_token_nlu_tokens_fails(
-    client, db, create_token_hash, alice_webhook_payload
+# New tests for word-number token linking
+
+def test_link_account_handler_with_word_number_code_success(
+    client, db, create_word_number_token, alice_webhook_payload
 ):
     """
-    Test A: Send payload with valid token in nlu.tokens.
-    Expects successful linking, but current handler should fail.
+    Test: Successful linking when utterance contains a valid word-number code.
     """
-    token_words = ["мост", "белый", "дом"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=12345,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
+    plaintext_token, account_link_token = create_word_number_token(telegram_user_id=12345)
 
     payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт"] + token_words,
-        original_utterance="связать аккаунт мост белый дом",
+        original_utterance=f"связать аккаунт {plaintext_token}",
+        user_id="test-alice-user-id",
     )
     response = client.post(
         "/alice_webhook/", json.dumps(payload), content_type="application/json"
@@ -90,19 +106,20 @@ def test_smoke_valid_token_nlu_tokens_fails(
 
     assert response.status_code == 200
     assert LinkAccountMessages.SUCCESS in response_data["response"]["text"]
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is True
+    assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is True
+    assert User.objects.get(alice_user_id="test-alice-user-id").telegram_user_id == str(12345)
 
 
-def test_smoke_invalid_token_nlu_tokens_fails(
-    client, db, create_token_hash, alice_webhook_payload
+def test_link_account_handler_with_word_number_code_fail_invalid_code(
+    client, db, alice_webhook_payload
 ):
     """
-    Test B: Send payload with invalid token in nlu.tokens (not in DB).
-    Expects failure (original error message).
+    Test: Failed linking when utterance contains an invalid word-number code (not in DB).
     """
+    invalid_token = "неслово-000"
     payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт", "не", "существующий", "токен"],
-        original_utterance="связать аккаунт не существующий токен",
+        original_utterance=f"связать аккаунт {invalid_token}",
+        user_id="test-alice-user-id",
     )
     response = client.post(
         "/alice_webhook/", json.dumps(payload), content_type="application/json"
@@ -112,143 +129,19 @@ def test_smoke_invalid_token_nlu_tokens_fails(
     assert response.status_code == 200
     assert LinkAccountMessages.FAIL in response_data["response"]["text"]
     assert "Аккаунты связаны" not in response_data["response"]["text"]
-    assert not AccountLinkToken.objects.filter(
-        token_hash=create_token_hash(" ".join(sorted(["не", "существующий", "токен"])))
-    ).exists()
 
 
-@pytest.fixture
-def normalize_spoken_token_func():
-    # This fixture will provide the function once it's implemented in helpers.py
-    from alice_skill.helpers import normalize_spoken_token
-
-    return normalize_spoken_token
-
-
-def test_normalize_spoken_token_basic(normalize_spoken_token_func):
-    assert normalize_spoken_token_func(["мост", "белый", "дом"]) == "мост белый дом"
-
-
-def test_normalize_spoken_token_uppercase(normalize_spoken_token_func):
-    assert normalize_spoken_token_func(["МОСТ", "БЕЛЫЙ", "ДОМ"]) == "мост белый дом"
-
-
-def test_normalize_spoken_token_latin_lookalikes(normalize_spoken_token_func):
-    # Example: 'c' (Latin) -> 'с' (Cyrillic)
-    assert normalize_spoken_token_func(["cтоп", "в", "пути"]) == "стоп в пути"
-
-
-def test_normalize_spoken_token_punctuation_hyphen(normalize_spoken_token_func):
-    assert normalize_spoken_token_func(["мост-", "белый.", "дом!"]) == "мост белый дом"
-
-
-def test_normalize_spoken_token_empty_list(normalize_spoken_token_func):
-    assert normalize_spoken_token_func([]) == ""
-
-
-def test_normalize_spoken_token_single_word(normalize_spoken_token_func):
-    assert normalize_spoken_token_func(["слово"]) == "слово"
-
-
-def test_normalize_spoken_token_multiple_spaces(normalize_spoken_token_func):
-    assert (
-        normalize_spoken_token_func(["  мост  ", "  белый  ", "  дом  "])
-        == "мост белый дом"
-    )
-
-
-def test_normalize_spoken_token_yo_to_e(normalize_spoken_token_func):
-    assert normalize_spoken_token_func(["ёлка", "мёд", "пёс"]) == "елка мед пес"
-
-
-def test_iteration2_nlu_tokens_primary_extraction(
-    client, db, secret, create_token_hash, alice_webhook_payload
+def test_link_account_handler_with_word_number_code_fail_expired_code(
+    client, db, create_word_number_token, alice_webhook_payload
 ):
     """
-    Test: when nlu.tokens = ["мост","белый","дом"], handler calls normalize_spoken_token,
-    computes token_hash = HMAC(SECRET, token_norm), and finds the matching token row in DB.
-    Expected: Alice JSON with "text":"Аккаунты связаны. Спасибо!", HTTP 200, and DB: link_tokens.used == true.
+    Test: Failed linking when utterance contains an expired word-number code.
     """
-    token_words = ["мост", "белый", "дом"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=12345,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
+    plaintext_token, account_link_token = create_word_number_token(telegram_user_id=12345, expires_in_minutes=-10)
 
     payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт"] + token_words,
-        original_utterance="связать аккаунт мост белый дом",
-    )
-    response = client.post(
-        "/alice_webhook/", json.dumps(payload), content_type="application/json"
-    )
-
-    assert response.status_code == 200
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is True
-
-
-def test_iteration3_nlu_tokens_fragmented(
-    client, db, secret, create_token_hash, alice_webhook_payload
-):
-    """
-    Test: nlu.tokens might be ["мост","бел","ый","дом"] or include noise tokens;
-    implement logic to find the best consecutive sequence of three valid Russian-word tokens.
-    Expect success when three-word sequence present.
-    """
-    token_words = ["мост", "белый", "дом"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=12345,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
-
-    # Case 1: Fragmented tokens
-    payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт", "какой-то", "шум"]
-        + token_words
-        + ["еще", "слова"],
-        original_utterance="связать аккаунт какой-то шум мост белый дом еще слова",
-    )
-    response = client.post(
-        "/alice_webhook/", json.dumps(payload), content_type="application/json"
-    )
-    response_data = response.json()
-
-    assert response.status_code == 200
-    assert LinkAccountMessages.SUCCESS in response_data["response"]["text"]
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is True
-
-
-def test_iteration3_nlu_tokens_no_valid_triple(
-    client, db, secret, create_token_hash, alice_webhook_payload
-):
-    """
-    Test: nlu.tokens does not contain a valid three-word sequence.
-    Expects failure (original error message).
-    """
-    token_words = ["мост", "белый", "дом"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=12345,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
-
-    payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт", "один", "два", "четыре"],
-        original_utterance="связать аккаунт один два четыре",
+        original_utterance=f"связать аккаунт {plaintext_token}",
+        user_id="test-alice-user-id",
     )
     response = client.post(
         "/alice_webhook/", json.dumps(payload), content_type="application/json"
@@ -258,30 +151,18 @@ def test_iteration3_nlu_tokens_no_valid_triple(
     assert response.status_code == 200
     assert LinkAccountMessages.FAIL in response_data["response"]["text"]
     assert "Аккаунты связаны" not in response_data["response"]["text"]
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is False
+    assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is False
 
 
-def test_iteration5_advanced_asr_morphological_variants(
-    client, db, secret, create_token_hash, alice_webhook_payload
+def test_link_account_handler_instructions_no_code(
+    client, db, alice_webhook_payload
 ):
     """
-    Test: nlu.tokens contains morphological variants, but normalization should still match.
+    Test: When utterance contains a trigger but no word-number code, provide instructions.
     """
-    token_words = ["мост", "белый", "дом"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=12345,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
-
-    # Morphological variants (e.g., different endings)
     payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт"] + token_words,
-        original_utterance="связать аккаунт мост белый дом",
+        original_utterance="связать аккаунт",
+        user_id="test-alice-user-id",
     )
     response = client.post(
         "/alice_webhook/", json.dumps(payload), content_type="application/json"
@@ -289,40 +170,18 @@ def test_iteration5_advanced_asr_morphological_variants(
     response_data = response.json()
 
     assert response.status_code == 200
-    assert LinkAccountMessages.SUCCESS in response_data["response"]["text"]
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is True
+    assert LinkAccountMessages.ACCOUNT_LINKING_INSTRUCTIONS in response_data["response"]["text"]
 
 
-def test_iteration5_advanced_asr_extra_words_and_punctuation(
-    client, db, secret, create_token_hash, alice_webhook_payload
+def test_link_account_handler_instructions_no_code_with_other_words(
+    client, db, alice_webhook_payload
 ):
     """
-    Test: nlu.tokens contains extra words and punctuation, but the core triple should be recovered.
+    Test: When utterance contains a trigger and other words but no word-number code, provide instructions.
     """
-    token_words = ["мост", "белый", "дом"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=12345,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
-
-    # Extra words and punctuation
     payload = alice_webhook_payload(
-        nlu_tokens=[
-            "связать",
-            "аккаунт",
-            "пожалуйста",
-            "скажи",
-            "мост,",
-            "белый",
-            "дом!",
-            "спасибо",
-        ],
-        original_utterance="связать аккаунт пожалуйста скажи мост, белый дом! спасибо",
+        original_utterance="привяжи телеграм пожалуйста",
+        user_id="test-alice-user-id",
     )
     response = client.post(
         "/alice_webhook/", json.dumps(payload), content_type="application/json"
@@ -330,31 +189,18 @@ def test_iteration5_advanced_asr_extra_words_and_punctuation(
     response_data = response.json()
 
     assert response.status_code == 200
-    assert LinkAccountMessages.SUCCESS in response_data["response"]["text"]
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is True
+    assert LinkAccountMessages.ACCOUNT_LINKING_INSTRUCTIONS in response_data["response"]["text"]
 
 
-def test_iteration5_advanced_asr_no_match_after_normalization(
-    client, db, secret, create_token_hash, alice_webhook_payload
+def test_link_account_handler_no_trigger_no_code(
+    client, db, alice_webhook_payload
 ):
     """
-    Test: nlu.tokens contains words that, even after normalization, do not form a valid triple.
-    Expects failure.
+    Test: When utterance contains neither a trigger nor a word-number code, handler should return None.
     """
-    token_words = ["мост", "белый", "дом"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=12345,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
-
     payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт", "один", "два", "четыре", "пять"],
-        original_utterance="связать аккаунт один два четыре пять",
+        original_utterance="просто какой-то текст",
+        user_id="test-alice-user-id",
     )
     response = client.post(
         "/alice_webhook/", json.dumps(payload), content_type="application/json"
@@ -362,68 +208,11 @@ def test_iteration5_advanced_asr_no_match_after_normalization(
     response_data = response.json()
 
     assert response.status_code == 200
-    assert LinkAccountMessages.FAIL in response_data["response"]["text"]
-    assert "Аккаунты связаны" not in response_data["response"]["text"]
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is False
-
-
-def test_iteration4_token_one_time_use(
-    client, db, secret, create_token_hash, alice_webhook_payload
-):
-    """
-    Test: Attempt to reuse the same token twice.
-    First call: success. Second call: failure with message "token already used".
-    """
-    token_words = ["один", "два", "три"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=12345,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
-
-    payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт"] + token_words,
-        original_utterance="связать аккаунт один два три",
-        user_id="user-first-try",
-    )
-
-    # First attempt: should succeed
-    response1 = client.post(
-        "/alice_webhook/", json.dumps(payload), content_type="application/json"
-    )
-    response_data1 = response1.json()
-
-    assert response1.status_code == 200
-    assert LinkAccountMessages.SUCCESS in response_data1["response"]["text"]
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is True
-    assert (
-        User.objects.get(telegram_user_id=str(12345)).alice_user_id == "user-first-try"
-    )
-
-    # Second attempt with the same token: should fail
-    payload_second = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт"] + token_words,
-        original_utterance="связать аккаунт один два три",
-        user_id="user-second-try",
-    )
-    response2 = client.post(
-        "/alice_webhook/", json.dumps(payload_second), content_type="application/json"
-    )
-    response_data2 = response2.json()
-
-    assert response2.status_code == 200
-    assert LinkAccountMessages.FAIL in response_data2["response"]["text"]
-    assert "Аккаунты связаны" not in response_data2["response"]["text"]
-    # Ensure the token remains used=True and linked to the first user
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is True
+    assert HandlerMessages.ERROR_UNPARSED in response_data["response"]["text"]
 
 
 def test_link_account_handler_update_telegram_user_id(
-    client, db, secret, create_token_hash, alice_webhook_payload
+    client, db, create_word_number_token, alice_webhook_payload
 ):
     """
     Test: If an Alice user already exists and is linked to a Telegram user,
@@ -437,21 +226,11 @@ def test_link_account_handler_update_telegram_user_id(
 
     # 2. Generate a new token for a DIFFERENT Telegram user
     new_telegram_user_id = 98765
-    token_words = ["четыре", "пять", "шесть"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=new_telegram_user_id,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
+    plaintext_token, account_link_token = create_word_number_token(telegram_user_id=new_telegram_user_id)
 
     # 3. Simulate Alice webhook with the existing Alice user_id and the new token
     payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт"] + token_words,
-        original_utterance="связать аккаунт четыре пять шесть",
+        original_utterance=f"связать аккаунт {plaintext_token}",
         user_id="user-first-try",
     )
 
@@ -466,11 +245,11 @@ def test_link_account_handler_update_telegram_user_id(
     # 4. Assert that the Alice user's telegram_user_id has been updated
     user = User.objects.get(alice_user_id="user-first-try")
     assert user.telegram_user_id == str(new_telegram_user_id)
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is True
+    assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is True
 
 
 def test_link_account_handler_conflict_telegram_user_id(
-    client, db, secret, create_token_hash, alice_webhook_payload
+    client, db, create_word_number_token, alice_webhook_payload
 ):
     """
     Test: If a telegram_user_id is already linked to a different alice_user_id,
@@ -486,22 +265,12 @@ def test_link_account_handler_conflict_telegram_user_id(
     )
 
     # 2. Generate a token for the SAME telegram_user_id
-    token_words = ["семь", "восемь", "девять"]
-    token_norm = " ".join(sorted(token_words))
-    token_hash = create_token_hash(token_norm)
-    AccountLinkToken.objects.create(
-        token_hash=token_hash,
-        telegram_user_id=telegram_id_in_conflict,
-        expires_at=timezone.now() + timedelta(days=1),
-        used=False,
-        token_word_count=len(token_words),
-    )
+    plaintext_token, account_link_token = create_word_number_token(telegram_user_id=telegram_id_in_conflict)
 
     # 3. Simulate Alice webhook with a DIFFERENT alice_user_id and the token
     new_alice_user_id = "alice-user-new"
     payload = alice_webhook_payload(
-        nlu_tokens=["связать", "аккаунт"] + token_words,
-        original_utterance="связать аккаунт семь восемь девять",
+        original_utterance=f"связать аккаунт {plaintext_token}",
         user_id=new_alice_user_id,
     )
 
@@ -520,4 +289,4 @@ def test_link_account_handler_conflict_telegram_user_id(
     # 5. Assert that the new alice_user_id is now linked to the telegram_user_id
     new_user = User.objects.get(alice_user_id=new_alice_user_id)
     assert new_user.telegram_user_id == str(telegram_id_in_conflict)
-    assert AccountLinkToken.objects.get(token_hash=token_hash).used is True
+    assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is True
