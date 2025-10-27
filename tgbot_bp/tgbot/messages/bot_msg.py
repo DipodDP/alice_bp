@@ -1,10 +1,3 @@
 class BotMessages:
-    START = "Бот Alice BP успешно запущен и готов к работе."
-
-    HELP = ("- Для связывания аккаунтов используйте команду `/link КОД`, " 
-            "полученный в навыке Алисы.")
-
-    STOP = "Bot is stopped"
-    LINK_NO_CODE = "Пожалуйста, укажите код после команды. Например: `/link A1B2-C3D4`"
-    LINK_SUCCESS = "Аккаунты успешно связаны!"
-    LINK_ERROR = "Произошла неизвестная ошибка. Попробуйте получить код еще раз и повторить попытку."
+    START = "Bot Alice BP successfully started!"
+    STOP = "Bot is stopped..."

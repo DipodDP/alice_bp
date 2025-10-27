@@ -24,6 +24,15 @@ class BloodPressureApi(BaseClient):
             headers["Authorization"] = f"Token {self._token}"
         return headers
 
+    def _parse_results(self, data: dict | list) -> list:
+        """Extract results from paginated or plain list response."""
+        if isinstance(data, dict) and "results" in data:
+            return list(data["results"])
+        if isinstance(data, list):
+            return data
+        self.log.error("Unexpected response format: %r", type(data))
+        return []
+
     async def get_measurements(
         self,
         user_id: str,
@@ -31,6 +40,7 @@ class BloodPressureApi(BaseClient):
         end_date: str,
         ordering: str = "-created_at",
     ) -> list[dict]:
+        """Fetch measurements for a user within a date range."""
         try:
             _, data = await self._make_request(
                 method="GET",
@@ -43,43 +53,25 @@ class BloodPressureApi(BaseClient):
                 },
                 headers=self._auth_headers(),
             )
+            return self._parse_results(data)
         except ClientError as e:
             self.log.error("Failed to fetch measurements: %s", e)
             return []
 
-        # Accept both paginated and plain list formats
-        if isinstance(data, dict) and "results" in data:
-            return list(data["results"])
-        if isinstance(data, list):
-            return data
-        self.log.error("Unexpected response format: %r", type(data))
-        return []
-
     async def get_last_measurement(self, user_id: str) -> Optional[dict]:
-        """Fetch latest measurement for user."""
+        """Fetch latest measurement for a user."""
         try:
             _, data = await self._make_request(
                 method="GET",
                 url="/measurements/",
-                params={
-                    "user_id": user_id,
-                    "ordering": "-created_at",
-                },
+                params={"user_id": user_id, "ordering": "-created_at"},
                 headers=self._auth_headers(),
             )
+            results = self._parse_results(data)
+            return results[0] if results else None
         except ClientError as e:
             self.log.error("Failed to fetch last measurement: %s", e)
             return None
-
-        if isinstance(data, dict) and "results" in data:
-            results = list(data["results"]) or []
-        elif isinstance(data, list):
-            results = data
-        else:
-            self.log.error("Unexpected response format: %r", type(data))
-            return None
-
-        return results[0] if results else None
 
     async def get_user_by_telegram_id(self, telegram_user_id: int) -> Optional[dict]:
         """Fetch user data by their telegram ID."""
@@ -91,9 +83,17 @@ class BloodPressureApi(BaseClient):
             )
             if status_code == 200:
                 return data
+            if status_code == 404:
+                return None
+            self.log.error(
+                f"Failed to fetch user by telegram_id {telegram_user_id}. "
+                f"Status: {status_code}, Response: {data}"
+            )
             return None
         except ClientError as e:
-            self.log.error(f"Failed to fetch user by telegram_id {telegram_user_id}: {e}")
+            self.log.error(
+                f"Failed to fetch user by telegram_id {telegram_user_id}: {e}"
+            )
             return None
 
 

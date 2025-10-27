@@ -1,5 +1,5 @@
 from aiogram import Router
-from aiogram.filters import Command, CommandStart, CommandObject
+from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 from aiogram_dialog import DialogManager, StartMode
 
@@ -27,6 +27,8 @@ async def process_unlink_command(message: Message, bp_api: BloodPressureApi):
         await message.answer(response.get("message"))
     else:
         await message.answer(UserHandlerMessages.UNLINK_ERROR)
+
+    await message.delete()
 
 
 @user_router.message(CommandStart())
@@ -67,7 +69,9 @@ async def process_link_command(message: Message, bp_api: BloodPressureApi):
     if response and response.get("status") == "success":
         token = response.get("token")
         if token:
-            await message.answer(UserHandlerMessages.LINK_INITIATE_SUCCESS.format(token=token))
+            await message.answer(
+                UserHandlerMessages.LINK_INITIATE_SUCCESS.format(token=token)
+            )
         else:
             await message.answer(UserHandlerMessages.LINK_INITIATE_ERROR)
     elif response and response.get("message"):
@@ -75,10 +79,14 @@ async def process_link_command(message: Message, bp_api: BloodPressureApi):
     else:
         await message.answer(UserHandlerMessages.LINK_INITIATE_ERROR)
 
+    await message.delete()
 
-@user_router.message(Command('help'))
+
+@user_router.message(Command("help"))
 async def help_command(message: Message):
     """
     Handler for the /help command.
     """
     await message.reply(UserHandlerMessages.HELP)
+
+    await message.delete()
