@@ -2,7 +2,6 @@ import logging
 import re
 import secrets
 import hmac
-import itertools
 from . import messages
 from .models import User, AccountLinkToken
 from .wordlist import WORDLIST
@@ -12,13 +11,18 @@ from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
+
 class TooManyRequests(Exception):
     pass
+
 
 class TokenAlreadyUsed(Exception):
     pass
 
-RATE_LIMIT_SECONDS = 60 # 1 minute rate limit for token generation
+
+RATE_LIMIT_SECONDS = getattr(settings, "ALICE_LINK_RATE_LIMIT_SECONDS", 60)
+TOKEN_LIFETIME_MINUTES = getattr(settings, "ALICE_LINK_TOKEN_LIFETIME_MINUTES", 10)
+
 
 def generate_link_token(telegram_user_id: int) -> str:
     """
@@ -34,26 +38,19 @@ def generate_link_token(telegram_user_id: int) -> str:
     if last_token and (timezone.now() - last_token.created_at).total_seconds() < RATE_LIMIT_SECONDS:
         raise TooManyRequests(messages.ServiceMessages.RATE_LIMIT_ERROR)
 
-    # Generate a random word from the wordlist
     random_word = secrets.SystemRandom().choice(WORDLIST)
-    # Generate a random 3-digit number
     random_number = secrets.SystemRandom().randint(100, 999)
-
     plaintext_token = f"{random_word}-{random_number}"
-
-    # Normalize the token for hashing (lowercase)
     normalized_token = plaintext_token.lower()
 
-    # Hash the token for storage
     token_hash = hmac.new(
         settings.LINK_SECRET.encode(),
         normalized_token.encode(),
         'sha256'
     ).hexdigest()
 
-    expires_at = timezone.now() + timedelta(minutes=10) # Configurable lifetime
+    expires_at = timezone.now() + timedelta(minutes=TOKEN_LIFETIME_MINUTES)
 
-    # Store the hashed token and metadata
     AccountLinkToken.objects.create(
         token_hash=token_hash,
         telegram_user_id=telegram_user_id,
@@ -63,97 +60,92 @@ def generate_link_token(telegram_user_id: int) -> str:
 
     return plaintext_token
 
+
+def _normalize_nlu_tokens(nlu_tokens: list[str]) -> list[str]:
+    """
+    Normalizes NLU tokens from Alice webhook by splitting, lowercasing, fixing common
+    character mistakes (e.g., 'ё', Latin letters in Russian words), and cleaning them
+    to contain only Cyrillic characters or digits.
+    """
+    normalized_tokens = []
+    for token in nlu_tokens:
+        sub_tokens = token.split(' ')
+        for sub_token in sub_tokens:
+            word = sub_token.lower().replace('ё', 'е')
+            # Homoglyph replacement
+            word = word.replace('a', 'а').replace('e', 'е').replace('o', 'о').replace('p', 'р').replace('c', 'с').replace('x', 'х').replace('y', 'у')
+
+            if re.match(r'^[а-яё]+-\d{3}$', word):
+                normalized_tokens.append(word)
+            elif word.isdigit():
+                normalized_tokens.append(word)
+            else:
+                cleaned_word = re.sub(r'[^а-я]', '', word)
+                if cleaned_word:
+                    normalized_tokens.append(cleaned_word)
+    return normalized_tokens
+
+
+def _generate_candidate_phrases(tokens: list[str]) -> list[str]:
+    """
+    Generates potential token phrases from a list of normalized tokens.
+    Handles cases like: "word-123", "word 123", "word" + "123", and "word" + "1" + "2" + "3".
+    """
+    phrases = []
+    for i, token in enumerate(tokens):
+        if re.match(r'^[а-яё]+[ -]\d{3}$', token):
+            phrases.append(token.replace(' ', '-'))
+
+        if token in WORDLIST:
+            if i + 1 < len(tokens) and tokens[i + 1].isdigit() and len(tokens[i + 1]) == 3:
+                phrases.append(f"{token}-{tokens[i + 1]}")
+            elif i + 3 < len(tokens) and all(t.isdigit() and len(t) == 1 for t in tokens[i + 1:i + 4]):
+                phrases.append(f"{token}-{''.join(tokens[i + 1:i + 4])}")
+    return list(set(phrases))
+
+
 def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
     """
     Matches incoming Alice webhook NLU tokens against stored AccountLinkTokens.
     Returns the telegram_user_id if a match is found, otherwise None.
+    This optimized version generates candidate phrases first and then performs a single DB query.
     """
-    alice_user_id = webhook_json.get("session", {}).get("user_id")
-    if not alice_user_id:
-        alice_user_id = webhook_json.get("session", {}).get("user", {}).get("user_id")
+    alice_user_id = webhook_json.get("session", {}).get("user_id") or webhook_json.get("session", {}).get("user", {}).get("user_id")
     if not alice_user_id:
         return None
 
     nlu_tokens = webhook_json.get("request", {}).get("nlu", {}).get("tokens", [])
     if not nlu_tokens:
         return None
-    
-    # Normalize NLU tokens
-    normalized_nlu_tokens = []
-    for token in nlu_tokens:
-        # Split tokens by space to handle cases like "инжир 788"
-        sub_tokens = token.split(' ')
-        for sub_token in sub_tokens:
-            word = sub_token.lower()
-            word = word.replace('ё', 'е')
-            word = word.replace('a', 'а').replace('e', 'е').replace('o', 'о').replace('p', 'р').replace('c', 'с').replace('x', 'х').replace('y', 'у')
-            
-            # Keep the original token if it matches the word-number pattern
-            if re.match(r'^[а-яё]+-\d{3}$', word):
-                normalized_nlu_tokens.append(word)
-            elif word.isdigit(): # Keep purely numeric tokens
-                normalized_nlu_tokens.append(word)
-            else:
-                # Otherwise, remove non-Cyrillic characters and append if not empty
-                cleaned_word = re.sub(r'[^а-я]', '', word)
-                if cleaned_word:
-                    normalized_nlu_tokens.append(cleaned_word)
 
-    current_time = timezone.now()
-    all_tokens = AccountLinkToken.objects.filter(
-        expires_at__gt=current_time
-    )
+    normalized_tokens = _normalize_nlu_tokens(nlu_tokens)
+    candidate_phrases = _generate_candidate_phrases(normalized_tokens)
 
-    for account_link_token in all_tokens:
-        for i, nlu_token in enumerate(normalized_nlu_tokens):
-            candidate_token_phrase = None
-            # Check if the current token is a word from our wordlist
-            if nlu_token in WORDLIST:
-                # Look for a three-digit number immediately following the word, potentially split into individual digits
-                if i + 3 < len(normalized_nlu_tokens) and \
-                   normalized_nlu_tokens[i+1].isdigit() and \
-                   normalized_nlu_tokens[i+2].isdigit() and \
-                   normalized_nlu_tokens[i+3].isdigit():
-                    combined_number = f"{normalized_nlu_tokens[i+1]}{normalized_nlu_tokens[i+2]}{normalized_nlu_tokens[i+3]}"
-                    if len(combined_number) == 3:
-                        candidate_token_phrase = f"{nlu_token}-{combined_number}"
-                elif i + 1 < len(normalized_nlu_tokens) and normalized_nlu_tokens[i+1].isdigit():
-                    # This handles cases where the number is a single token, e.g., "слово-123"
-                    if len(normalized_nlu_tokens[i+1]) == 3:
-                        candidate_token_phrase = f"{nlu_token}-{normalized_nlu_tokens[i+1]}"
-                # If the word itself is the token (e.g., 'горох-882' was not split)
-                elif re.match(r'^[а-яё]+-\d{3}$', nlu_token):
-                    candidate_token_phrase = nlu_token
-            # If the token is already in 'word-number' format or 'word number' format
-            elif re.match(r'^[а-яё]+[ -]\d{3}$', nlu_token):
-                candidate_token_phrase = nlu_token.replace(' ', '-')
-            
-            if candidate_token_phrase:
-                candidate_token_hash = hmac.new(
-                    settings.LINK_SECRET.encode(),
-                    candidate_token_phrase.encode(),
-                    'sha256'
-                ).hexdigest()
+    if not candidate_phrases:
+        return None
 
-                if candidate_token_hash == account_link_token.token_hash:
-                    # Found a match!
-                    if account_link_token.used:
-                        raise TokenAlreadyUsed
+    candidate_hashes = [hmac.new(settings.LINK_SECRET.encode(), p.encode(), 'sha256').hexdigest() for p in candidate_phrases]
 
-                    account_link_token.used = True
-                    account_link_token.save()
+    account_link_token = AccountLinkToken.objects.filter(
+        token_hash__in=candidate_hashes,
+        expires_at__gt=timezone.now(),
+    ).order_by('created_at').first()
 
-                    telegram_user_id_str = str(account_link_token.telegram_user_id)
+    if not account_link_token:
+        return None
 
-                    # Find or create the user based on the Alice ID
-                    user, created = User.objects.get_or_create(alice_user_id=alice_user_id)
+    if account_link_token.used:
+        raise TokenAlreadyUsed
 
-                    # Clear any existing user's telegram_user_id if it matches the new one
-                    User.objects.filter(telegram_user_id=telegram_user_id_str).exclude(pk=user.pk).update(telegram_user_id=None)
+    account_link_token.used = True
+    account_link_token.save()
 
-                    user.telegram_user_id = telegram_user_id_str
-                    user.save()
+    telegram_user_id_str = str(account_link_token.telegram_user_id)
 
-                    return account_link_token.telegram_user_id
+    user, _ = User.objects.get_or_create(alice_user_id=alice_user_id)
+    User.objects.filter(telegram_user_id=telegram_user_id_str).exclude(pk=user.pk).update(telegram_user_id=None)
+    user.telegram_user_id = telegram_user_id_str
+    user.save()
 
-    return None
+    return account_link_token.telegram_user_id
+

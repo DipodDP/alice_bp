@@ -90,13 +90,11 @@ def alice_webhook_payload(session_id="test-session", message_id=1, user_id="test
 def test_link_account_handler_with_word_number_code_success(
     client, db, create_word_number_token, alice_webhook_payload
 ):
-    """
-    Test: Successful linking when utterance contains a valid word-number code.
-    """
     plaintext_token, account_link_token = create_word_number_token(telegram_user_id=12345)
 
     payload = alice_webhook_payload(
         original_utterance=f"связать аккаунт {plaintext_token}",
+        nlu_tokens=f"связать аккаунт {plaintext_token}".split(),
         user_id="test-alice-user-id",
     )
     response = client.post(
@@ -119,6 +117,7 @@ def test_link_account_handler_with_word_number_code_fail_invalid_code(
     invalid_token = "неслово-000"
     payload = alice_webhook_payload(
         original_utterance=f"связать аккаунт {invalid_token}",
+        nlu_tokens=f"связать аккаунт {invalid_token}".split(),
         user_id="test-alice-user-id",
     )
     response = client.post(
@@ -141,6 +140,7 @@ def test_link_account_handler_with_word_number_code_fail_expired_code(
 
     payload = alice_webhook_payload(
         original_utterance=f"связать аккаунт {plaintext_token}",
+        nlu_tokens=f"связать аккаунт {plaintext_token}".split(),
         user_id="test-alice-user-id",
     )
     response = client.post(
@@ -231,6 +231,7 @@ def test_link_account_handler_update_telegram_user_id(
     # 3. Simulate Alice webhook with the existing Alice user_id and the new token
     payload = alice_webhook_payload(
         original_utterance=f"связать аккаунт {plaintext_token}",
+        nlu_tokens=f"связать аккаунт {plaintext_token}".split(),
         user_id="user-first-try",
     )
 
@@ -271,6 +272,7 @@ def test_link_account_handler_conflict_telegram_user_id(
     new_alice_user_id = "alice-user-new"
     payload = alice_webhook_payload(
         original_utterance=f"связать аккаунт {plaintext_token}",
+        nlu_tokens=f"связать аккаунт {plaintext_token}".split(),
         user_id=new_alice_user_id,
     )
 

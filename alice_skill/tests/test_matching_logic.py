@@ -3,7 +3,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from ..models import AccountLinkToken
-from ..services import generate_link_token, match_webhook_to_telegram_user
+from ..services import generate_link_token, match_webhook_to_telegram_user, TokenAlreadyUsed
 
 class WebhookMatchingLogicTest(TestCase):
     def setUp(self):
@@ -144,6 +144,6 @@ class WebhookMatchingLogicTest(TestCase):
             "request": {"nlu": {"tokens": [plaintext_token_used]}},
             "version": "1.0"
         }
-        matched_telegram_user_id_second_use = match_webhook_to_telegram_user(webhook_json_second_use)
-        self.assertIsNone(matched_telegram_user_id_second_use)
+        with self.assertRaises(TokenAlreadyUsed):
+            match_webhook_to_telegram_user(webhook_json_second_use)
         self.assertTrue(AccountLinkToken.objects.get(telegram_user_id=self.telegram_user_id + 2).used) # Still used

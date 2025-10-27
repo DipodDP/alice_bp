@@ -7,7 +7,6 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import messages
 from .messages import GenerateLinkTokenViewMessages, UnlinkViewMessages, LinkStatusViewMessages, ViewMessages
 from .helpers import build_alice_response_payload
 from .models import BloodPressureMeasurement, User
@@ -195,6 +194,6 @@ class GenerateLinkTokenView(APIView):
             return Response({"status": "success", "token": plaintext_token, "message": GenerateLinkTokenViewMessages.SUCCESS}, status=status.HTTP_201_CREATED)
         except TooManyRequests as e:
             return Response({"status": "error", "message": str(e)}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        except Exception as e:
+        except Exception:
             logger.exception("Error generating link token")
             return Response({"status": "error", "message": GenerateLinkTokenViewMessages.FAIL}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
