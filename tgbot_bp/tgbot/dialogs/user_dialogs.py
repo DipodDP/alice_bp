@@ -11,6 +11,7 @@ from aiogram_dialog.widgets.text import Const, Format, Multi
 from tgbot.dialogs.callbacks import (
     selected_interval,
     selected_measurement,
+    set_prev_message,
 )
 from tgbot.dialogs.getters import get_time_interval, get_measurements_data
 from tgbot.dialogs.states import (
@@ -43,6 +44,7 @@ user_menu_dialog = Dialog(
             Const(UserDialogButtons.GET_REPORT),
             id="get_report",
             state=MainMenu.interval_selection,
+            on_click=set_prev_message
         ),
         state=MainMenu.main,
     ),

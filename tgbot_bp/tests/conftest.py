@@ -17,3 +17,9 @@ def message_mock():
 @pytest.fixture
 def bp_api_mock():
     return AsyncMock(spec=BloodPressureApi)
+
+
+@pytest.fixture
+def state_mock():
+    from aiogram.fsm.context import FSMContext
+    return AsyncMock(spec=FSMContext)

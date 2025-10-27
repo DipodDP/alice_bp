@@ -7,6 +7,7 @@ from aiogram_dialog.widgets.kbd import Button, Select
 from tgbot.keyboards.reply import user_menu_keyboard
 from tgbot.messages.handlers_msg import UserHandlerMessages
 from tgbot.dialogs.states import MainMenu
+from tgbot.services.utils import delete_prev_message
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +21,8 @@ async def set_prev_message(
         return
     data = dialog_manager.middleware_data
     state: FSMContext = data["state"]
-    await callback_query.message.delete()
-    answer = await callback_query.message.answer(
-        UserHandlerMessages.CANCEL, reply_markup=user_menu_keyboard()
-    )
-    await state.update_data(prev_bot_message=answer)
+    await delete_prev_message(state)
+    await state.update_data(prev_bot_message=callback_query.message)
 
 
 async def selected_interval(
@@ -62,6 +60,7 @@ async def action_done(
         return
     data = dialog_manager.middleware_data
     state: FSMContext = data["state"]
+    await delete_prev_message(state)
     await callback_query.message.delete()
     answer = await callback_query.message.answer(
         UserHandlerMessages.COMPLETED, reply_markup=user_menu_keyboard()

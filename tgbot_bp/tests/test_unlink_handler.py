@@ -1,7 +1,9 @@
 import pytest
+from unittest.mock import AsyncMock, patch
 
 from tgbot.handlers.user import process_unlink_command
 from tgbot.messages.handlers_msg import UserHandlerMessages
+
 
 
 @pytest.mark.parametrize(
@@ -17,16 +19,18 @@ from tgbot.messages.handlers_msg import UserHandlerMessages
     ],
 )
 @pytest.mark.asyncio
+@patch("tgbot.handlers.user.delete_prev_message", new_callable=AsyncMock)
 async def test_process_unlink_command_parameterized(
-    message_mock, bp_api_mock, api_return_value, fallback_message
+    mock_delete_prev_message, message_mock, bp_api_mock, state_mock, api_return_value, fallback_message
 ):
     """
     Test process_unlink_command with various API responses using parametrization.
     """
     bp_api_mock.unlink_account.return_value = api_return_value
 
-    await process_unlink_command(message_mock, bp_api_mock)
+    await process_unlink_command(message_mock, bp_api_mock, state_mock)
 
+    mock_delete_prev_message.assert_called_once_with(state_mock)
     bp_api_mock.unlink_account.assert_called_once_with(str(message_mock.from_user.id))
 
     expected_message = (
@@ -35,3 +39,4 @@ async def test_process_unlink_command_parameterized(
         else fallback_message
     )
     message_mock.answer.assert_called_once_with(expected_message)
+    state_mock.update_data.assert_called_once()
