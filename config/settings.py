@@ -23,5 +23,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-load_dotenv()
+# load_dotenv()
+load_dotenv(f"{BASE_DIR}/.env")
 include("components/*.py")

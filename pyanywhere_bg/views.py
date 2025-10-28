@@ -114,60 +114,64 @@ def webhook_handler(request):
     - Returns proxied response to caller, filtering hop-by-hop headers.
     - Uses a timeout and handles connection errors gracefully.
     """
-    local_url = f"http://{WEBAPP_HOST}:{WEBAPP_PORT}{WEBHOOK_PATH}"
-    query = request.META.get("QUERY_STRING", "")
-    if query:
-        local_url = f"{local_url}?{query}"
-
-    # Build headers for requests, skip 'Host' so requests sets correct Host for local target
-    headers: Dict[str, str] = {
-        k: v for k, v in request.headers.items() if k.lower() != "host"
-    }
-
-    # Forward cookies and body; for GET/HEAD no body is sent.
-    cookies = request.COOKIES or {}
-    data = request.body if request.method.upper() not in ("GET", "HEAD") else None
-
     try:
-        proxied = requests.request(
-            method=request.method,
-            url=local_url,
-            headers=headers,
-            params=request.GET.dict(),
-            data=data,
-            cookies=cookies,
-            allow_redirects=False,
-            timeout=15,
-        )
-        logger.debug("Proxying request to %s: %s", local_url, proxied)
-    except RequestException as exc:
-        logger.exception("Error proxying request to %s: %s", local_url, exc)
-        return HttpResponse(f"Proxy error: {exc}", status=502)
+        local_url = f"http://{WEBAPP_HOST}:{WEBAPP_PORT}{WEBHOOK_PATH}"
+        query = request.META.get("QUERY_STRING", "")
+        if query:
+            local_url = f"{local_url}?{query}"
 
-    content_type = proxied.headers.get("Content-Type", "")
-    # Build Django response from proxied response
-    if "application/json" in (content_type or ""):
+        # Build headers for requests, skip 'Host' so requests sets correct Host for local target
+        headers: Dict[str, str] = {
+            k: v for k, v in request.headers.items() if k.lower() != "host"
+        }
+
+        # Forward cookies and body; for GET/HEAD no body is sent.
+        cookies = request.COOKIES or {}
+        data = request.body if request.method.upper() not in ("GET", "HEAD") else None
+
         try:
-            data_json = proxied.json()
-            # JsonResponse requires safe=False for non-dict JSON (lists etc.)
-            response = JsonResponse(data_json, safe=isinstance(data_json, dict))
-        except Exception:
-            # Fallback to raw body if JSON parsing fails
-            response = HttpResponse(proxied.content, content_type=content_type)
-    else:
-        response = HttpResponse(
-            proxied.content, content_type=content_type or "application/octet-stream"
-        )
+            proxied = requests.request(
+                method=request.method,
+                url=local_url,
+                headers=headers,
+                params=request.GET.dict(),
+                data=data,
+                cookies=cookies,
+                allow_redirects=False,
+                timeout=15,
+            )
+            logger.debug("Proxying request to %s: %s", local_url, proxied)
+        except RequestException as exc:
+            logger.exception("Error proxying request to %s: %s", local_url, exc)
+            return HttpResponse(f"Proxy error: {exc}", status=502)
 
-    response.status_code = proxied.status_code
+        content_type = proxied.headers.get("Content-Type", "")
+        # Build Django response from proxied response
+        if "application/json" in (content_type or ""):
+            try:
+                data_json = proxied.json()
+                # JsonResponse requires safe=False for non-dict JSON (lists etc.)
+                response = JsonResponse(data_json, safe=isinstance(data_json, dict))
+            except Exception:
+                # Fallback to raw body if JSON parsing fails
+                response = HttpResponse(proxied.content, content_type=content_type)
+        else:
+            response = HttpResponse(
+                proxied.content, content_type=content_type or "application/octet-stream"
+            )
 
-    # Copy proxied headers except hop-by-hop ones
-    for key, value in proxied.headers.items():
-        if key.lower() in HOP_BY_HOP_HEADERS:
-            continue
-        # Avoid overwriting Content-Type set above unnecessarily
-        if key.lower() == "content-type":
-            continue
-        response[key] = value
+        response.status_code = proxied.status_code
 
-    return response
+        # Copy proxied headers except hop-by-hop ones
+        for key, value in proxied.headers.items():
+            if key.lower() in HOP_BY_HOP_HEADERS:
+                continue
+            # Avoid overwriting Content-Type set above unnecessarily
+            if key.lower() == "content-type":
+                continue
+            response[key] = value
+
+        return response
+    except Exception as e:
+        logger.exception("An unexpected error occurred in webhook_handler: %s", e)
+        return HttpResponse("An unexpected error occurred.", status=500)
