@@ -18,7 +18,11 @@ async def on_startup(bot, base_url):
 
 def main():
     # Create an API client instance
-    bp_api = BloodPressureApi(base_url=config.django_api.base_url, api_token=config.django_api.api_token)
+    bp_api = BloodPressureApi(
+        base_url=config.django_api.base_url, 
+        api_token=config.django_api.api_token,
+        proxy=config.tg_bot.proxy_url,
+    )
 
     # Pass the API client to the dispatcher context
     dp["bp_api"] = bp_api

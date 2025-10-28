@@ -28,8 +28,8 @@ class BaseClient:
     async def _get_session(self) -> ClientSession:
         """Get aiohttp session with cache."""
         if self._session is None:
-            ssl_context = ssl.SSLContext()
-            connector = TCPConnector(ssl_context=ssl_context)
+            ssl_context = ssl.create_default_context()
+            connector = TCPConnector(ssl=ssl_context)
             self._session = ClientSession(
                 base_url=self._base_url,
                 connector=connector,
