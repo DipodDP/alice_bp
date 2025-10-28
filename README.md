@@ -90,10 +90,47 @@ For full details on these endpoints, refer to the "Alice Skill Endpoints" sectio
     uv run manage.py runserver
     ```
 
+## Configuration
+
+1.  Create a `.env` file by copying the `.env.dist` file:
+    ```bash
+    cp .env.dist .env
+    ```
+2.  Open the `.env` file and edit the variables as needed.
+
+### Environment Variables
+
+#### Django (alice_bp)
+*   `SECRET_KEY`: Django's secret key.
+*   `DEBUG`: Set to `True` for development, `False` for production.
+*   `ALLOWED_HOSTS`: A comma-separated list of allowed hosts.
+*   `DATABASE_URL`: The URL for connecting to the database.
+*   `API_TOKEN`: A token for authenticating with the API.
+*   `LINK_SECRET`: A secret key for signing link tokens.
+*   `ALICE_BOT_USERNAME`: The username of your Alice bot.
+
+#### Telegram Bot (tgbot_bp)
+*   `CONSOLE_LOGGER_LVL`: The logging level for the console.
+*   `BOT_NAME`: The name of your Telegram bot.
+*   `BOT_TOKEN`: The token for your Telegram bot.
+*   `ADMINS`: A comma-separated list of admin user IDs.
+*   `USE_REDIS`: Set to `True` to use Redis for storage.
+
+#### PythonAnywhere Background Task (pyanywhere_bg)
+*   `SITE_URL`: The public URL of your site.
+*   `WEBHOOK_PATH`: The path for the webhook handler. Default is `/webhook`.
+*   `WEBAPP_HOST`: The host for the local web application. Default is `localhost`.
+*   `WEBAPP_PORT`: The port for the local web application. Default is `8080`.
+*   `PROXY_TIMEOUT`: The timeout in seconds for proxying requests. Default is `15`.
+
 ## Testing
 
 To run the tests, use the following command:
 
 ```bash
 uv run manage.py test
+```
+
+```bash
+uv run pytest tgbot_bp
 ```

@@ -13,10 +13,6 @@ from requests.exceptions import RequestException
 
 logger = logging.getLogger(__name__)
 
-WEBHOOK_PATH = "/webhook"
-WEBAPP_HOST = "localhost"  # or ip
-WEBAPP_PORT = 8080
-
 process = None
 
 # Headers that must NOT be forwarded from proxied response to client (hop-by-hop)
@@ -84,14 +80,13 @@ def start(request):
             # stdout = open(os.path.join(cwd, "uv_stdout.log"), "a", buffering=1)
             # stderr = open(os.path.join(cwd, "uv_stderr.log"), "a", buffering=1)
 
-
             cmd = ["uv", "run", "tgbot_bp/main.py", site_url]
             process = subprocess.Popen(
                 cmd,
                 cwd=cwd,
-            #    stdout=stdout,
-            #    stderr=stderr,
-            #    start_new_session=True,  # detach signals on POSIX
+                #    stdout=stdout,
+                #    stderr=stderr,
+                #    start_new_session=True,  # detach signals on POSIX
             )
             logger.info(
                 "Started main.py subprocess (pid=%s) with SITE_URL=%s",
@@ -115,7 +110,10 @@ def webhook_handler(request):
     - Uses a timeout and handles connection errors gracefully.
     """
     try:
-        local_url = f"http://{WEBAPP_HOST}:{WEBAPP_PORT}{WEBHOOK_PATH}"
+        webhook_path = getattr(settings, "WEBHOOK_PATH", "/webhook")
+        webapp_host = getattr(settings, "WEBAPP_HOST", "localhost")
+        webapp_port = getattr(settings, "WEBAPP_PORT", 8080)
+        local_url = f"http://{webapp_host}:{webapp_port}{webhook_path}"
         query = request.META.get("QUERY_STRING", "")
         if query:
             local_url = f"{local_url}?{query}"
@@ -130,6 +128,7 @@ def webhook_handler(request):
         data = request.body if request.method.upper() not in ("GET", "HEAD") else None
 
         try:
+            proxy_timeout = getattr(settings, "PROXY_TIMEOUT", 15)
             proxied = requests.request(
                 method=request.method,
                 url=local_url,
@@ -138,7 +137,7 @@ def webhook_handler(request):
                 data=data,
                 cookies=cookies,
                 allow_redirects=False,
-                timeout=15,
+                timeout=proxy_timeout,
             )
             logger.debug("Proxying request to %s: %s", local_url, proxied)
         except RequestException as exc:
