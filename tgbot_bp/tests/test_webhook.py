@@ -4,7 +4,6 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
-import pytest_asyncio
 
 # A mock bot token for testing
 BOT_TOKEN = "123456:ABC-DEF1234567890"

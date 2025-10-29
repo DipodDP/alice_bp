@@ -1,20 +1,20 @@
+import json
+import hmac
+import hashlib
+import secrets
+from datetime import timedelta
+
 import pytest
+from django.utils import timezone
+
+from ..messages import LinkAccountMessages, HandlerMessages
+from ..models import AccountLinkToken, User
+from ..wordlist import WORDLIST
 
 
 @pytest.fixture(autouse=True)
 def alice_secret(settings):
     settings.ALICE_WEBHOOK_SECRET = "test-secret"
-
-
-import json
-import hmac
-import hashlib
-from datetime import timedelta
-from django.utils import timezone
-from ..messages import LinkAccountMessages, HandlerMessages
-from ..models import AccountLinkToken, User
-from ..wordlist import WORDLIST
-import secrets
 
 # Mock settings for testing
 

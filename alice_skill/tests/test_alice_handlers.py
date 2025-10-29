@@ -116,6 +116,7 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # 1. Generate a token (simulating Telegram bot generating it)
         plaintext_token_hyphen = generate_link_token(self.telegram_user_id) # e.g., "гвоздика-857"
+        word, number = plaintext_token_hyphen.split('-')
 
         # 2. Simulate Alice webhook with NLU tokens containing the split number
         data = {
@@ -125,9 +126,9 @@ class AliceHandlerAPITestCase(APITestCase):
                 "user_id": self.alice_user_id,
             },
             "request": {
-                "command": "свяжи аккаунт код гвоздика 8 5 7",
-                "original_utterance": "свяжи аккаунт код гвоздика восемь пять семь",
-                "nlu": {"tokens": ["свяжи", "аккаунт", "код", "гвоздика", "8", "5", "7"]},
+                "command": f"свяжи аккаунт код {word} {' '.join(list(number))}",
+                "original_utterance": f"свяжи аккаунт код {word} {' '.join(list(number))}",
+                "nlu": {"tokens": ["свяжи", "аккаунт", "код", word, *list(number)]},
             },
             "version": "1.0",
         }
@@ -159,6 +160,7 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # 1. Generate a token (simulating Telegram bot generating it)
         plaintext_token_hyphen = generate_link_token(self.telegram_user_id) # e.g., "укроп-853"
+        word, number = plaintext_token_hyphen.split('-')
 
         # 2. Simulate Alice webhook with NLU tokens containing the code only
         data = {
@@ -168,9 +170,9 @@ class AliceHandlerAPITestCase(APITestCase):
                 "user_id": self.alice_user_id,
             },
             "request": {
-                "command": "код укроп 853",
-                "original_utterance": "код укроп 853",
-                "nlu": {"tokens": ["код", "укроп", "853"]},
+                "command": f"код {word} {number}",
+                "original_utterance": f"код {word} {number}",
+                "nlu": {"tokens": ["код", word, number]},
             },
             "version": "1.0",
         }
