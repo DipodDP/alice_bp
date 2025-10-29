@@ -64,6 +64,71 @@ The Telegram bot consumes the following endpoints from the Alice Skill API:
 
 For full details on these endpoints, refer to the "Alice Skill Endpoints" section.
 
+## Webhook Security
+
+To secure the webhooks and ensure that requests are only coming from Yandex and Telegram, the application uses secret tokens. You must configure these for the application to work correctly with webhooks.
+
+#### Token Generation Examples
+
+You can use one of the following commands to generate a secure random string for your tokens:
+
+**Using `openssl`:**
+```bash
+openssl rand -hex 32
+```
+
+**Using `/dev/urandom` (on Linux/macOS):**
+```bash
+head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32
+```
+
+**Django:**
+```bash
+echo "SECRET_KEY=$(uv run - <<'PY'                                                                                                     ─╯
+from django.core.management.utils import get_random_secret_key
+print(get_random_secret_key())
+PY
+)" >> .env
+chmod 600 .env
+```
+
+
+### Alice (Yandex.Dialogs)
+
+The Alice webhook is secured using a token passed in the URL as a query parameter.
+
+1.  **Generate a Secret:** Create a long, random, and secure string for your secret token.
+2.  **Set Environment Variable:** Set the `ALICE_WEBHOOK_SECRET` environment variable to your generated secret.
+3.  **Configure Webhook URL:** In the Yandex.Dialogs console, set your webhook URL to:
+    ```
+    https://your-domain.com/alice_webhook?token=YOUR_SECRET_TOKEN
+    ```
+    Replace `YOUR_SECRET_TOKEN` with the secret you generated.
+
+4.  **Get the Full URL:** To easily get the full, correctly formatted webhook URL, run the following management command:
+    ```bash
+    uv run manage.py print_alice_webhook
+    ```
+    This will print the URL to your console, which you can then copy and paste into the Yandex.Dialogs console.
+
+### Telegram
+
+The Telegram bot webhook is secured using a secret token sent in the `X-Telegram-Bot-Api-Secret-Token` header.
+
+1.  **Generate a Secret:** Create a long, random, and secure string for your secret token (1-256 characters: A-Z, a-z, 0-9, _ and -).
+2.  **Set Environment Variable:** Set the `BOT_WEBHOOK_SECRET` environment variable to your generated secret.
+3.  **Set Webhook with Telegram:** When you set your webhook URL with the Telegram Bot API, include the `secret_token` parameter. The bot application will handle this automatically if you are running it in webhook mode.
+
+#### Local Development Note
+
+When running the application locally with a tunneling service like `localtunnel` (`loca.lt`), be aware that these services often **do not forward custom HTTP headers**. This means the `X-Telegram-Bot-Api-Secret-Token` header sent by Telegram will not reach your application.
+
+To handle this during local development, simply **do not set** the `BOT_WEBHOOK_SECRET` environment variable in your `.env` file. The application is configured to bypass the secret check when this variable is empty.
+
+In a **production environment**, you **must** set `BOT_WEBHOOK_SECRET` to a secure value. The application will then enforce the secret token check.
+
+
+
 ## Getting Started
 
 ### Prerequisites
@@ -74,54 +139,47 @@ For full details on these endpoints, refer to the "Alice Skill Endpoints" sectio
 
 ### Installation
 
+
+
 1.  Clone the repository:
+
     ```bash
+
     git clone https://github.com/your-username/alice-bp.git
-    ```
-2.  Install the dependencies:
-    ```bash
-    uv sync --all-packages
-    ```3.  Set up the database:
-    ```bash
-    uv run manage.py migrate
-    ```
-4.  Run the development server:
-    ```bash
-    uv run manage.py runserver
+
     ```
 
-## Configuration
+2.  Set up your environment variables. Copy the `.env.dist` file to `.env` and fill in the required values, including the secret tokens as described in the "Webhook Security" section.
 
-1.  Create a `.env` file by copying the `.env.dist` file:
     ```bash
+
     cp .env.dist .env
+
     ```
-2.  Open the `.env` file and edit the variables as needed.
 
-### Environment Variables
+3.  Install the dependencies:
 
-#### Django (alice_bp)
-*   `SECRET_KEY`: Django's secret key.
-*   `DEBUG`: Set to `True` for development, `False` for production.
-*   `ALLOWED_HOSTS`: A comma-separated list of allowed hosts.
-*   `DATABASE_URL`: The URL for connecting to the database.
-*   `API_TOKEN`: A token for authenticating with the API.
-*   `LINK_SECRET`: A secret key for signing link tokens.
-*   `ALICE_BOT_USERNAME`: The username of your Alice bot.
+    ```bash
 
-#### Telegram Bot (tgbot_bp)
-*   `CONSOLE_LOGGER_LVL`: The logging level for the console.
-*   `BOT_NAME`: The name of your Telegram bot.
-*   `BOT_TOKEN`: The token for your Telegram bot.
-*   `ADMINS`: A comma-separated list of admin user IDs.
-*   `USE_REDIS`: Set to `True` to use Redis for storage.
+    uv sync --all-packages
 
-#### PythonAnywhere Background Task (pyanywhere_bg)
-*   `SITE_URL`: The public URL of your site.
-*   `WEBHOOK_PATH`: The path for the webhook handler. Default is `/webhook`.
-*   `WEBAPP_HOST`: The host for the local web application. Default is `localhost`.
-*   `WEBAPP_PORT`: The port for the local web application. Default is `8080`.
-*   `PROXY_TIMEOUT`: The timeout in seconds for proxying requests. Default is `15`.
+    ```
+
+4.  Set up the database:
+
+    ```bash
+
+    uv run manage.py migrate
+
+    ```
+
+5.  Run the development server:
+
+    ```bash
+
+    uv run manage.py runserver
+
+    ```
 
 ## Testing
 
@@ -129,8 +187,4 @@ To run the tests, use the following command:
 
 ```bash
 uv run manage.py test
-```
-
-```bash
-uv run pytest tgbot_bp
 ```

@@ -21,6 +21,7 @@ class TgBot:
     bot_webhook_host: str | None = None
     webapp_host: str | None = None
     webapp_port: int | None = None
+    webhook_secret: str | None = None
 
     @staticmethod
     def from_env(env: Env):
@@ -41,6 +42,7 @@ class TgBot:
         bot_webhook_host = env.str("BOT_WEBHOOK_HOST", default=None)
         webapp_host = env.str("WEBAPP_HOST", default=None)
         webapp_port = env.int("WEBAPP_PORT", default=None)
+        webhook_secret = env.str("BOT_WEBHOOK_SECRET", default=None)
         return TgBot(
             token=token,
             admin_ids=admin_ids,
@@ -50,6 +52,7 @@ class TgBot:
             bot_webhook_host=bot_webhook_host,
             webapp_host=webapp_host,
             webapp_port=webapp_port,
+            webhook_secret=webhook_secret,
         )
 
 

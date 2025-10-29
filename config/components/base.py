@@ -16,6 +16,9 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
 ).split(",")
 
 
+ALICE_WEBHOOK_SECRET = os.environ.get("ALICE_WEBHOOK_SECRET")
+
+
 ROOT_URLCONF = "config.urls"
 
 WSGI_APPLICATION = "config.wsgi.application"

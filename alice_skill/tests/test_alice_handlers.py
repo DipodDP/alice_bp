@@ -1,3 +1,4 @@
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -10,11 +11,13 @@ from ..models import User, AccountLinkToken
 from ..services import generate_link_token
 
 
+@override_settings(ALICE_WEBHOOK_SECRET="test-secret")
 class AliceHandlerAPITestCase(APITestCase):
     def setUp(self):
         self.alice_user_id = "TEST_ALICE_HANDLER_USER_ID"
         self.telegram_user_id = 12345
         self.url = reverse("alice-webhook")
+        self.token = "test-secret"
 
     @patch("alice_skill.services.secrets.SystemRandom")
     def test_link_account_handler_success(self, mock_system_random):
@@ -42,7 +45,7 @@ class AliceHandlerAPITestCase(APITestCase):
             "version": "1.0",
         }
 
-        response = self.client.post(self.url, data, format="json")
+        response = self.client.post(f"{self.url}?token={self.token}", data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_data = response.json()
@@ -86,7 +89,7 @@ class AliceHandlerAPITestCase(APITestCase):
             "version": "1.0",
         }
 
-        response = self.client.post(self.url, data, format="json")
+        response = self.client.post(f"{self.url}?token={self.token}", data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_data = response.json()
@@ -129,7 +132,7 @@ class AliceHandlerAPITestCase(APITestCase):
             "version": "1.0",
         }
 
-        response = self.client.post(self.url, data, format="json")
+        response = self.client.post(f"{self.url}?token={self.token}", data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_data = response.json()
@@ -172,7 +175,7 @@ class AliceHandlerAPITestCase(APITestCase):
             "version": "1.0",
         }
 
-        response = self.client.post(self.url, data, format="json")
+        response = self.client.post(f"{self.url}?token={self.token}", data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_data = response.json()
@@ -218,7 +221,7 @@ class AliceHandlerAPITestCase(APITestCase):
             "version": "1.0",
         }
 
-        response = self.client.post(self.url, data, format="json")
+        response = self.client.post(f"{self.url}?token={self.token}", data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_data = response.json()
@@ -251,7 +254,7 @@ class AliceHandlerAPITestCase(APITestCase):
             "version": "1.0",
         }
 
-        response = self.client.post(self.url, data, format="json")
+        response = self.client.post(f"{self.url}?token={self.token}", data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_data = response.json()
@@ -282,7 +285,7 @@ class AliceHandlerAPITestCase(APITestCase):
             "version": "1.0",
         }
 
-        response = self.client.post(self.url, data, format="json")
+        response = self.client.post(f"{self.url}?token={self.token}", data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_data = response.json()

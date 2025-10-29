@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from .messages import GenerateLinkTokenViewMessages, UnlinkViewMessages, LinkStatusViewMessages, ViewMessages
 from .helpers import build_alice_response_payload
 from .models import BloodPressureMeasurement, User
-from .permissions import IsBot
+from .permissions import IsBot, IsAliceWebhook
 from .services import generate_link_token, TooManyRequests
 from .serializers import (
     AliceRequestSerializer,
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class AliceWebhookView(APIView):
     authentication_classes = []
-    permission_classes = [AllowAny]
+    permission_classes = [IsAliceWebhook]
     handlers = [
         StartDialogHandler(),
         LinkAccountHandler(),

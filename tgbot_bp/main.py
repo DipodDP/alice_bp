@@ -30,6 +30,7 @@ def run_webhook_server():
     SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
+        secret_token=config.tg_bot.webhook_secret,
     ).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
 
