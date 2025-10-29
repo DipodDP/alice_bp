@@ -3,7 +3,7 @@ from django.conf import settings
 
 
 class HandlerMessages(StrEnum):
-    GREETING = "Здравствуйте! Скажите давление."
+    GREETING = "Здравствуйте! Скажите давление и пульс."
     ERROR_UNPARSED = "Не удалось распознать цифры давления или команду. Попробуйте сказать, например, 'давление 120 на 80'."
 
 
@@ -22,7 +22,7 @@ class LinkAccountMessages(StrEnum):
 
 class RecordPressureMessages(StrEnum):
     SUCCESS = "Запомнила давление {systolic} на {diastolic}"
-    SUCCESS_WITH_PULSE = "Запомнил давление {systolic} на {diastolic}, пульс {pulse}"
+    SUCCESS_WITH_PULSE = "Запомнила давление {systolic} на {diastolic}, пульс {pulse}"
     INVALID = (
         "Некорректные значения давления. Пожалуйста, проверьте данные и повторите."
     )
