@@ -1,20 +1,22 @@
 import asyncio
 import logging
 import sys
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram_dialog import setup_dialogs
 
+from infrastructure.bp_api.api import BloodPressureApi
 from tgbot.core.config import WEBHOOK_PATH, Config, load_config
+from tgbot.core.logger import setup_logging
 from tgbot.dialogs import dialogs
 from tgbot.handlers import routers_list
+from tgbot.handlers.error import error_router
+from tgbot.middlewares.auth import AuthMiddleware
 from tgbot.middlewares.config import ConfigMiddleware
 from tgbot.misc import notify_admins
 from tgbot.misc.setting_comands import set_all_default_commands
-from tgbot.core.logger import setup_logging
-from tgbot.middlewares.auth import AuthMiddleware
-from infrastructure.bp_api.api import BloodPressureApi
 
 
 def register_global_middlewares(dp: Dispatcher, config: Config):
@@ -124,6 +126,7 @@ bp_api = BloodPressureApi(
 )
 dp["bp_api"] = bp_api
 
+dp.include_router(error_router)
 dp.include_routers(*routers_list)
 dp.include_routers(*dialogs)
 
