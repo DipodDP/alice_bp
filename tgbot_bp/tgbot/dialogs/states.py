@@ -1,0 +1,7 @@
+from aiogram.fsm.state import State, StatesGroup
+
+
+class MainMenu(StatesGroup):
+    main = State()
+    interval_selection = State()
+    pressure_results = State()

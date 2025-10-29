@@ -1,7 +1,12 @@
 import logging
+
+from ..messages import LastMeasurementMessages
 from .base import BaseAliceHandler
 from ..models import BloodPressureMeasurement
 from ..serializers import BloodPressureMeasurementSerializer
+from ..helpers import format_measured_at
+from django.utils import timezone
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,17 +29,30 @@ class LastMeasurementHandler(BaseAliceHandler):
             return
 
         logger.debug("LastMeasurementHandler: Fetching last blood pressure measurement")
-        last = BloodPressureMeasurement.objects.order_by("-created_at").first()
+        session = validated_request_data.get("session", {})
+        user_id = session.get("user_id")
+        if not user_id:
+            return LastMeasurementMessages.NO_RECORDS
+        last = (
+            BloodPressureMeasurement.objects.filter(user_id=user_id)
+            .order_by("-measured_at")
+            .first()
+        )
         if not last:
             logger.info("LastMeasurementHandler: No measurements found in database")
-            return "Записей пока нет."
+            return LastMeasurementMessages.NO_RECORDS
 
         serializer = BloodPressureMeasurementSerializer(last)
         data = serializer.data
-        reply = f"Последняя запись: {data['systolic']}/{data['diastolic']}"
+        reply = LastMeasurementMessages.REPLY.format(
+            systolic=data["systolic"], diastolic=data["diastolic"]
+        )
         if data.get("pulse"):
-            reply += f", пульс {data['pulse']}"
-        reply += f" (создано {data['created_at']})"
+            reply += LastMeasurementMessages.PULSE.format(pulse=data["pulse"])
+        user_timezone_str = validated_request_data.get("meta", {}).get(
+            "timezone", "UTC"
+        )
+        reply += f"({format_measured_at(data['measured_at'], user_timezone_str, timezone.now())})"
 
         logger.info(
             f"LastMeasurementHandler: Returning measurement: {data['systolic']}/{data['diastolic']}"

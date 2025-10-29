@@ -20,4 +20,5 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('alice_skill.urls')),
+    path('', include('pyanywhere_bg.urls')),
 ]

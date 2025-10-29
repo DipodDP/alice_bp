@@ -1,8 +1,20 @@
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from rest_framework import serializers
-from .models import BloodPressureMeasurement
+
+from .messages import SerializerMessages
+
+from .models import BloodPressureMeasurement, User
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "alice_user_id", "telegram_user_id"]
 
 
 class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
+    user_id = serializers.CharField(required=True, allow_blank=False)
     MIN_SYSTOLIC = 50
     MAX_SYSTOLIC = 300
     MIN_DIASTOLIC = 30
@@ -13,14 +25,14 @@ class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
     def validate_systolic(self, value):
         if not (self.MIN_SYSTOLIC <= value <= self.MAX_SYSTOLIC):
             raise serializers.ValidationError(
-                f"Systolic must be between {self.MIN_SYSTOLIC} and {self.MAX_SYSTOLIC}."
+                SerializerMessages.VALIDATION_SYSTOLIC_RANGE.format(min=self.MIN_SYSTOLIC, max=self.MAX_SYSTOLIC)
             )
         return value
 
     def validate_diastolic(self, value):
         if not (self.MIN_DIASTOLIC <= value <= self.MAX_DIASTOLIC):
             raise serializers.ValidationError(
-                f"Diastolic must be between {self.MIN_DIASTOLIC} and {self.MAX_DIASTOLIC}."
+                SerializerMessages.VALIDATION_DIASTOLIC_RANGE.format(min=self.MIN_DIASTOLIC, max=self.MAX_DIASTOLIC)
             )
         return value
 
@@ -30,17 +42,44 @@ class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
         pulse = attrs.get("pulse")
         if systolic is not None and diastolic is not None and systolic <= diastolic:
             raise serializers.ValidationError(
-                "Systolic must be greater than diastolic."
+                SerializerMessages.VALIDATION_SYSTOLIC_GT_DIASTOLIC
             )
         if pulse is not None and not (self.MIN_PULSE <= pulse <= self.MAX_PULSE):
             raise serializers.ValidationError(
-                f"Pulse must be between {self.MIN_PULSE} and {self.MAX_PULSE}."
+                SerializerMessages.VALIDATION_PULSE_RANGE.format(min=self.MIN_PULSE, max=self.MAX_PULSE)
             )
         return attrs
 
+    def to_representation(self, instance):
+        """
+        Convert `measured_at` to user's timezone if available in context.
+        """
+        representation = super().to_representation(instance)
+        tz_str = self.context.get("timezone")
+
+        if tz_str:
+            try:
+                tz = ZoneInfo(tz_str)
+                measured_at_dt = instance.measured_at
+                if measured_at_dt:
+                    representation["measured_at"] = measured_at_dt.astimezone(tz).isoformat()
+            except ZoneInfoNotFoundError:
+                pass  # Ignore invalid timezone, use default serialization
+        return representation
+
     class Meta:
         model = BloodPressureMeasurement
-        fields = ["systolic", "diastolic", "pulse", "created_at"]
+        fields = ["user_id", "systolic", "diastolic", "pulse", "measured_at"]
+
+
+class NLUObjectSerializer(serializers.Serializer):
+    tokens = serializers.ListField(child=serializers.CharField(), required=False, default=list())
+
+
+class MetaInfoSerializer(serializers.Serializer):
+    locale = serializers.CharField(required=False)
+    timezone = serializers.CharField(required=False)
+    client_id = serializers.CharField(required=False)
 
 
 # --- Request Serializers ---
@@ -49,6 +88,7 @@ class RequestObjectSerializer(serializers.Serializer):
         allow_blank=True, required=False, default=""
     )
     command = serializers.CharField(allow_blank=True, required=False, default="")
+    nlu = NLUObjectSerializer(required=False) # Add nlu field
 
 
 class SessionObjectSerializer(serializers.Serializer):
@@ -58,6 +98,7 @@ class SessionObjectSerializer(serializers.Serializer):
 
 
 class AliceRequestSerializer(serializers.Serializer):
+    meta = MetaInfoSerializer()
     request = RequestObjectSerializer()
     session = SessionObjectSerializer()
     version = serializers.CharField()
