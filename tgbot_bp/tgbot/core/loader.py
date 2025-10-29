@@ -14,6 +14,7 @@ from tgbot.misc import notify_admins
 from tgbot.misc.setting_comands import set_all_default_commands
 from tgbot.core.logger import setup_logging
 from tgbot.middlewares.auth import AuthMiddleware
+from infrastructure.bp_api.api import BloodPressureApi
 
 
 def register_global_middlewares(dp: Dispatcher, config: Config):
@@ -76,7 +77,7 @@ def exit_gracefully():
 async def on_startup():
     """Insert code here to run it after start"""
 
-    if url := config.tg_bot.webhook_host:
+    if url := config.tg_bot.bot_webhook_host:
         await bot.set_webhook(url + WEBHOOK_PATH)
     else:
         await bot.delete_webhook()
@@ -115,6 +116,13 @@ session = AiohttpSession(config.tg_bot.proxy_url) if config.tg_bot.proxy_url els
 
 bot = Bot(token=config.tg_bot.token, session=session)
 dp = Dispatcher(storage=get_storage(config))
+
+bp_api = BloodPressureApi(
+    base_url=config.django_api.base_url,
+    api_token=config.django_api.api_token,
+    proxy=config.tg_bot.proxy_url,
+)
+dp["bp_api"] = bp_api
 
 dp.include_routers(*routers_list)
 dp.include_routers(*dialogs)

@@ -18,7 +18,7 @@ class TgBot:
     proxy_url: str
     use_redis: bool
     console_log_level: str
-    webhook_host: str | None = None
+    bot_webhook_host: str | None = None
     webapp_host: str | None = None
     webapp_port: int | None = None
 
@@ -28,12 +28,8 @@ class TgBot:
         Creates the TgBot object from environment variables.
         """
         token = env.str("BOT_TOKEN")
-        admin_ids = list(map(int, env.list("ADMINS")))
+        admin_ids = [int(id) for id in env.list("ADMINS")]
         console_log_level = env.str("CONSOLE_LOGGER_LVL")
-        # admin_ids = list(map(
-        #     lambda item: int(item) if isinstance(item, int) else str(item),
-        #     env.list("ADMINS")
-        # ))
         use_redis = env.bool("USE_REDIS")
 
         proxy_vars = (
@@ -42,7 +38,7 @@ class TgBot:
         )
         proxy_url = next(filter(None, proxy_vars), None)
 
-        webhook_host = env.str("WEBHOOK_HOST", default=None)
+        bot_webhook_host = env.str("BOT_WEBHOOK_HOST", default=None)
         webapp_host = env.str("WEBAPP_HOST", default=None)
         webapp_port = env.int("WEBAPP_PORT", default=None)
         return TgBot(
@@ -51,7 +47,7 @@ class TgBot:
             use_redis=use_redis,
             console_log_level=console_log_level,
             proxy_url=proxy_url,
-            webhook_host=webhook_host,
+            bot_webhook_host=bot_webhook_host,
             webapp_host=webapp_host,
             webapp_port=webapp_port,
         )
