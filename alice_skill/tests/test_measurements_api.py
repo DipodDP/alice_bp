@@ -17,12 +17,12 @@ class MeasurementsApiBasicCrudTests(APITestCase):
     def test_list_empty_with_no_user_id(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, [])
+        self.assertEqual(response.data['results'], [])
 
     def test_list_empty_for_user_with_no_measurements(self):
         response = self.client.get(self.list_url, {"user_id": self.user.alice_user_id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, [])
+        self.assertEqual(response.data['results'], [])
 
     def test_create_and_retrieve(self):
         payload = {"user_id": self.user.alice_user_id, "systolic": 125, "diastolic": 82, "pulse": 70}
@@ -65,9 +65,9 @@ class MeasurementsApiUpdateDeleteOrderingTests(APITestCase):
         BloodPressureMeasurement.objects.create(user_id=self.user.alice_user_id, systolic=130, diastolic=85, pulse=75)
         list_resp = self.client.get(self.list_url, {"user_id": self.user.alice_user_id})
         self.assertEqual(list_resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(list_resp.data), 2)
-        self.assertEqual(list_resp.data[0]["systolic"], 130)
-        self.assertEqual(list_resp.data[1]["systolic"], 110)
+        self.assertEqual(list_resp.data['count'], 2)
+        self.assertEqual(len(list_resp.data['results']), 2)
+        self.assertEqual(list_resp.data['results'][0]["systolic"], 130)
 
 
 class MeasurementsApiValidationTests(APITestCase):
@@ -104,9 +104,10 @@ class MeasurementsApiTimezoneTests(APITestCase):
     def test_timezone_conversion(self):
         response = self.client.get(self.list_url, {"user_id": self.user.alice_user_id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(len(response.data['results']), 1)
 
-        measured_at_str = response.data[0]["measured_at"]
+        measured_at_str = response.data['results'][0]["measured_at"]
         measured_at_dt = datetime.fromisoformat(measured_at_str)
 
         # Check that the timezone is correct

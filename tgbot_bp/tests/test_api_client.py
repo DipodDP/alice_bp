@@ -29,3 +29,20 @@ async def test_blood_pressure_api_uses_proxy():
         assert kwargs.get("proxy") == proxy_url
 
     await api_client.close()
+
+def test_parse_results_paginated():
+    api_client = BloodPressureApi(base_url="http://fake-api.com")
+    paginated_data = {
+        "count": 1,
+        "next": None,
+        "previous": None,
+        "results": [{"id": 1, "value": "test"}]
+    }
+    result = api_client._parse_results(paginated_data)
+    assert result == [{"id": 1, "value": "test"}]
+
+def test_parse_results_list():
+    api_client = BloodPressureApi(base_url="http://fake-api.com")
+    list_data = [{"id": 1, "value": "test"}]
+    result = api_client._parse_results(list_data)
+    assert result == [{"id": 1, "value": "test"}]

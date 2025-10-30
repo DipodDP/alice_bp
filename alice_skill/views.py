@@ -98,8 +98,8 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             # Use the cached user property
             if self._request_user and self._request_user.alice_user_id:
-                return BloodPressureMeasurement.objects.filter(user_id=self._request_user.alice_user_id).order_by("-measured_at")
-            return BloodPressureMeasurement.objects.none()
+                return self.queryset.filter(user_id=self._request_user.alice_user_id)
+            return self.queryset.none()
         return super().get_queryset()
 
 

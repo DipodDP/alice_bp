@@ -1,0 +1,69 @@
+REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/day",
+        "user": "1000/m",
+    },
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,
+    "DEFAULT_FILTER_BACKENDS": [
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "SEARCH_PARAM": "search",
+    "ORDERING_PARAM": "ordering",
+    "FILTER_PARAM": "filter",
+    "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
+    "DEFAULT_METADATA_CLASS": "rest_framework.metadata.SimpleMetadata",
+    "DEFAULT_CONTENT_NEGOTIATION_CLASS": "rest_framework.negotiation.DefaultContentNegotiation",
+    "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
+    "DATETIME_INPUT_FORMATS": [
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%dT%H:%M:%S.%fZ",
+        "iso-8601",
+    ],
+    "DATE_FORMAT": "%Y-%m-%d",
+    "DATE_INPUT_FORMATS": [
+        "%Y-%m-%d",
+        "iso-8601",
+    ],
+    "TIME_FORMAT": "%H:%M:%S",
+    "TIME_INPUT_FORMATS": [
+        "%H:%M:%S",
+        "%H:%M:%S.%f",
+        "%H:%M",
+    ],
+    "UNICODE_JSON": True,
+    "COMPACT_JSON": False,
+    "STRICT_JSON": True,
+    "COERCE_DECIMAL_TO_STRING": True,
+    "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "TEST_REQUEST_RENDERER_CLASSES": [
+        "rest_framework.renderers.MultiPartRenderer",
+        "rest_framework.renderers.JSONRenderer",
+    ],
+    "URL_FORMAT_OVERRIDE": "format",
+    "FORMAT_SUFFIX_KWARG": "format",
+    "HTML_SELECT_CUTOFF": 1000,
+    "HTML_SELECT_CUTOFF_TEXT": "More than {count} items...",
+}

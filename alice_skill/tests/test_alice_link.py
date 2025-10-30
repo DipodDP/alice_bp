@@ -105,7 +105,7 @@ def test_link_account_handler_with_word_number_code_success(
         user_id="test-alice-user-id",
     )
     response = client.post(
-        "/alice_webhook?token=test-secret", json.dumps(payload), content_type="application/json"
+        "/alice_webhook/?token=test-secret", json.dumps(payload), content_type="application/json"
     )
     response_data = response.json()
 
@@ -128,7 +128,7 @@ def test_link_account_handler_with_word_number_code_fail_invalid_code(
         user_id="test-alice-user-id",
     )
     response = client.post(
-        "/alice_webhook?token=test-secret", json.dumps(payload), content_type="application/json"
+        "/alice_webhook/?token=test-secret", json.dumps(payload), content_type="application/json"
     )
     response_data = response.json()
 
@@ -151,7 +151,7 @@ def test_link_account_handler_with_word_number_code_fail_expired_code(
         user_id="test-alice-user-id",
     )
     response = client.post(
-        "/alice_webhook?token=test-secret", json.dumps(payload), content_type="application/json"
+        "/alice_webhook/?token=test-secret", json.dumps(payload), content_type="application/json"
     )
     response_data = response.json()
 
@@ -172,7 +172,7 @@ def test_link_account_handler_instructions_no_code(
         user_id="test-alice-user-id",
     )
     response = client.post(
-        "/alice_webhook?token=test-secret", json.dumps(payload), content_type="application/json"
+        "/alice_webhook/?token=test-secret", json.dumps(payload), content_type="application/json"
     )
     response_data = response.json()
 
@@ -191,7 +191,7 @@ def test_link_account_handler_instructions_no_code_with_other_words(
         user_id="test-alice-user-id",
     )
     response = client.post(
-        "/alice_webhook?token=test-secret", json.dumps(payload), content_type="application/json"
+        "/alice_webhook/?token=test-secret", json.dumps(payload), content_type="application/json"
     )
     response_data = response.json()
 
@@ -210,7 +210,7 @@ def test_link_account_handler_no_trigger_no_code(
         user_id="test-alice-user-id",
     )
     response = client.post(
-        "/alice_webhook?token=test-secret", json.dumps(payload), content_type="application/json"
+        "/alice_webhook/?token=test-secret", json.dumps(payload), content_type="application/json"
     )
     response_data = response.json()
 
@@ -243,7 +243,7 @@ def test_link_account_handler_update_telegram_user_id(
     )
 
     response = client.post(
-        "/alice_webhook?token=test-secret", json.dumps(payload), content_type="application/json"
+        "/alice_webhook/?token=test-secret", json.dumps(payload), content_type="application/json"
     )
     response_data = response.json()
 
@@ -284,7 +284,7 @@ def test_link_account_handler_conflict_telegram_user_id(
     )
 
     response = client.post(
-        "/alice_webhook?token=test-secret", json.dumps(payload), content_type="application/json"
+        "/alice_webhook/?token=test-secret", json.dumps(payload), content_type="application/json"
     )
     response_data = response.json()
 
