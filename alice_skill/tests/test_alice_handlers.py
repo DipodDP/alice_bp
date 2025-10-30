@@ -7,7 +7,7 @@ from unittest.mock import patch
 from ..messages import LinkAccountMessages
 
 
-from ..models import User, AccountLinkToken
+from ..models import AliceUser, AccountLinkToken
 from ..services import generate_link_token
 
 
@@ -233,7 +233,7 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # Ensure no new AccountLink record is created or existing one is changed
         self.assertFalse(
-            User.objects.filter(
+            AliceUser.objects.filter(
                 alice_user_id=self.alice_user_id, telegram_user_id=self.telegram_user_id
             ).exists()
         )
@@ -264,7 +264,7 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # Check that no AccountLink record is created
         self.assertFalse(
-            User.objects.filter(
+            AliceUser.objects.filter(
                 alice_user_id=self.alice_user_id, telegram_user_id=self.telegram_user_id
             ).exists()
         )

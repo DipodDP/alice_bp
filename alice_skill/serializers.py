@@ -4,12 +4,12 @@ from rest_framework import serializers
 
 from .messages import SerializerMessages
 
-from .models import BloodPressureMeasurement, User
+from .models import BloodPressureMeasurement, AliceUser
 
 
-class UserSerializer(serializers.ModelSerializer):
+class AliceUserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User
+        model = AliceUser
         fields = ["id", "alice_user_id", "telegram_user_id"]
 
 

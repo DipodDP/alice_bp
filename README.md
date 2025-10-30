@@ -129,6 +129,14 @@ In a **production environment**, you **must** set `BOT_WEBHOOK_SECRET` to a secu
 
 
 
+## User Management
+
+This project now includes a link between the Django `User` model and the Alice `AliceUser` model. This allows for more robust authentication and authorization.
+
+### API Authentication
+
+Access to the `/api/v1/measurements/` endpoint is restricted to authenticated Django users. Users can only view their own measurements. Superusers can view all measurements.
+
 ## Getting Started
 
 ### Prerequisites

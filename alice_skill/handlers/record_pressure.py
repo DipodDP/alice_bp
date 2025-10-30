@@ -6,7 +6,7 @@ from ..messages import RecordPressureMessages
 
 from ..handlers.base import BaseAliceHandler
 from ..serializers import BloodPressureMeasurementSerializer
-from ..models import User
+from ..models import AliceUser
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class RecordPressureHandler(BaseAliceHandler):
         user_timezone_str = validated_request_data.get("meta", {}).get(
             "timezone", "UTC"
         )
-        user, created = User.objects.get_or_create(alice_user_id=user_id)
+        user, created = AliceUser.objects.get_or_create(alice_user_id=user_id)
         if created:
             logger.info(f"New user created with alice_user_id: {user_id}")
         if user.timezone != user_timezone_str:

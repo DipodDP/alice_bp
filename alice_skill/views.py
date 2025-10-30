@@ -1,22 +1,22 @@
 import logging
-from functools import cached_property
 
-from django.db import models
 from rest_framework import viewsets, status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter
 
 from .messages import GenerateLinkTokenViewMessages, UnlinkViewMessages, LinkStatusViewMessages, ViewMessages
 from .helpers import build_alice_response_payload
-from .models import BloodPressureMeasurement, User
+from .models import BloodPressureMeasurement, AliceUser
 from .permissions import IsBot, IsAliceWebhook
 from .services import generate_link_token, TooManyRequests
 from .serializers import (
     AliceRequestSerializer,
     AliceResponseSerializer,
     BloodPressureMeasurementSerializer,
-    UserSerializer,
+    AliceUserSerializer,
 )
 from .handlers.common import StartDialogHandler, UnparsedHandler
 from .handlers.link_account import LinkAccountHandler
@@ -68,39 +68,34 @@ class AliceWebhookView(APIView):
 class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
     queryset = BloodPressureMeasurement.objects.all().order_by("-measured_at")
     serializer_class = BloodPressureMeasurementSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['user_id']
+    ordering_fields = ['measured_at', 'systolic', 'diastolic', 'pulse']
 
-    @cached_property
-    def _request_user(self):
-        """
-        Retrieves and caches the user object based on the 'user_id' query parameter
-        for the 'list' action. Returns None if not found or not applicable.
-        """
-        if self.action != 'list':
-            return None
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            user_id = self.request.query_params.get("user_id")
+            if user_id:
+                return self.queryset.filter(user_id=user_id)
+            return self.queryset
 
-        user_id_str = self.request.query_params.get("user_id")
-        if not user_id_str:
-            return None
-
-        return User.objects.filter(
-            models.Q(alice_user_id=user_id_str) | models.Q(telegram_user_id=user_id_str)
-        ).first()
+        try:
+            alice_user = AliceUser.objects.get(user=user)
+            return self.queryset.filter(user_id=alice_user.alice_user_id)
+        except AliceUser.DoesNotExist:
+            return self.queryset.none()
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        # Use the cached user property
-        if self._request_user and self._request_user.timezone:
-            context['timezone'] = self._request_user.timezone
+        try:
+            user = self.request.user
+            alice_user = AliceUser.objects.get(user=user)
+            context['timezone'] = alice_user.timezone
+        except (AliceUser.DoesNotExist, AttributeError):
+            pass
         return context
-
-    def get_queryset(self):
-        if self.action == 'list':
-            # Use the cached user property
-            if self._request_user and self._request_user.alice_user_id:
-                return self.queryset.filter(user_id=self._request_user.alice_user_id)
-            return self.queryset.none()
-        return super().get_queryset()
 
 
 class LinkStatusView(APIView):
@@ -115,9 +110,9 @@ class LinkStatusView(APIView):
 
         user = None
         if alice_user_id:
-            user = User.objects.filter(alice_user_id=alice_user_id).first()
+            user = AliceUser.objects.filter(alice_user_id=alice_user_id).first()
         elif telegram_user_id:
-            user = User.objects.filter(telegram_user_id=telegram_user_id).first()
+            user = AliceUser.objects.filter(telegram_user_id=telegram_user_id).first()
         if user:
             if user.telegram_user_id:
                 return Response({"status": "linked", "message": LinkStatusViewMessages.LINKED}, status=status.HTTP_200_OK)
@@ -140,9 +135,9 @@ class UnlinkView(APIView):
 
             user = None
             if alice_user_id:
-                user = User.objects.filter(alice_user_id=alice_user_id).first()
+                user = AliceUser.objects.filter(alice_user_id=alice_user_id).first()
             elif telegram_user_id:
-                user = User.objects.filter(telegram_user_id=telegram_user_id).first()
+                user = AliceUser.objects.filter(telegram_user_id=telegram_user_id).first()
             else:
                 return Response({"status": "error", "message": ViewMessages.UNABLE_TO_IDENTIFY_USER}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -165,10 +160,10 @@ class UserByTelegramView(APIView):
 
     def get(self, request, telegram_id, *args, **kwargs):
         try:
-            user = User.objects.get(telegram_user_id=telegram_id)
-            serializer = UserSerializer(user)
+            user = AliceUser.objects.get(telegram_user_id=telegram_id)
+            serializer = AliceUserSerializer(user)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        except User.DoesNotExist:
+        except AliceUser.DoesNotExist:
             return Response({"status": "error", "message": ViewMessages.USER_NOT_FOUND}, status=status.HTTP_404_NOT_FOUND)
 
 

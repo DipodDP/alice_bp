@@ -10,7 +10,7 @@ from .views import (
 )
 
 router = DefaultRouter()
-router.register(r"measurements", BloodPressureMeasurementViewSet, basename="measurement")
+router.register(r"api/v1/measurements", BloodPressureMeasurementViewSet, basename="measurement")
 
 urlpatterns = [
     path("alice_webhook/", AliceWebhookView.as_view(), name="alice-webhook"),

@@ -1,8 +1,10 @@
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils import timezone
 
 
-class User(models.Model):
+class AliceUser(models.Model):
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True, blank=True)
     alice_user_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     telegram_user_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     timezone = models.CharField(max_length=50, default='UTC')
@@ -10,7 +12,7 @@ class User(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"User(alice_id={self.alice_user_id}, tg_id={self.telegram_user_id})"
+        return f"AliceUser(user={self.user}, alice_id={self.alice_user_id}, tg_id={self.telegram_user_id})"
 
 
 class BloodPressureMeasurement(models.Model):

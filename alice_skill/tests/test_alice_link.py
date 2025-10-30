@@ -8,7 +8,7 @@ import pytest
 from django.utils import timezone
 
 from ..messages import LinkAccountMessages, HandlerMessages
-from ..models import AccountLinkToken, User
+from ..models import AccountLinkToken, AliceUser
 from ..wordlist import WORDLIST
 
 
@@ -112,7 +112,7 @@ def test_link_account_handler_with_word_number_code_success(
     assert response.status_code == 200
     assert LinkAccountMessages.SUCCESS in response_data["response"]["text"]
     assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is True
-    assert User.objects.get(alice_user_id="test-alice-user-id").telegram_user_id == str(12345)
+    assert AliceUser.objects.get(alice_user_id="test-alice-user-id").telegram_user_id == str(12345)
 
 
 def test_link_account_handler_with_word_number_code_fail_invalid_code(
@@ -227,8 +227,7 @@ def test_link_account_handler_update_telegram_user_id(
     """
     # 1. Create an existing Alice user linked to an initial Telegram user
     initial_telegram_user_id = 54321
-    User.objects.create(
-        alice_user_id="user-first-try", telegram_user_id=str(initial_telegram_user_id)
+    AliceUser.objects.create( telegram_user_id=str(initial_telegram_user_id)
     )
 
     # 2. Generate a new token for a DIFFERENT Telegram user
@@ -251,7 +250,7 @@ def test_link_account_handler_update_telegram_user_id(
     assert LinkAccountMessages.SUCCESS in response_data["response"]["text"]
 
     # 4. Assert that the Alice user's telegram_user_id has been updated
-    user = User.objects.get(alice_user_id="user-first-try")
+    user = AliceUser.objects.get(alice_user_id="user-first-try")
     assert user.telegram_user_id == str(new_telegram_user_id)
     assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is True
 
@@ -267,7 +266,7 @@ def test_link_account_handler_conflict_telegram_user_id(
     # 1. Create an existing User with a telegram_user_id linked to an initial alice_user_id
     existing_alice_user_id = "alice-user-old"
     telegram_id_in_conflict = 112233
-    User.objects.create(
+    AliceUser.objects.create(
         alice_user_id=existing_alice_user_id,
         telegram_user_id=str(telegram_id_in_conflict),
     )
@@ -292,10 +291,10 @@ def test_link_account_handler_conflict_telegram_user_id(
     assert LinkAccountMessages.SUCCESS in response_data["response"]["text"]
 
     # 4. Assert that the original alice_user_id's telegram_user_id is now None (unlinked)
-    old_user = User.objects.get(alice_user_id=existing_alice_user_id)
+    old_user = AliceUser.objects.get(alice_user_id=existing_alice_user_id)
     assert old_user.telegram_user_id is None
 
     # 5. Assert that the new alice_user_id is now linked to the telegram_user_id
-    new_user = User.objects.get(alice_user_id=new_alice_user_id)
+    new_user = AliceUser.objects.get(alice_user_id=new_alice_user_id)
     assert new_user.telegram_user_id == str(telegram_id_in_conflict)
     assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is True

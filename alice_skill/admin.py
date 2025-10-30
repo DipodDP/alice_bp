@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import BloodPressureMeasurement, User, AccountLinkToken
+from .models import BloodPressureMeasurement, AliceUser, AccountLinkToken
 
 
 @admin.register(BloodPressureMeasurement)
@@ -9,8 +9,8 @@ class BloodPressureMeasurementAdmin(admin.ModelAdmin):
     search_fields = ("user_id", "systolic", "diastolic")
 
 
-@admin.register(User)
-class UserAdmin(admin.ModelAdmin):
+@admin.register(AliceUser)
+class AliceUserAdmin(admin.ModelAdmin):
     list_display = ("alice_user_id", "telegram_user_id", "timezone", "created_at")
     list_filter = ("timezone",)
     search_fields = ("alice_user_id", "telegram_user_id")

@@ -3,7 +3,7 @@ import re
 import secrets
 import hmac
 from . import messages
-from .models import User, AccountLinkToken
+from .models import AliceUser, AccountLinkToken
 from .wordlist import WORDLIST
 from django.conf import settings
 from django.utils import timezone
@@ -142,8 +142,8 @@ def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
 
     telegram_user_id_str = str(account_link_token.telegram_user_id)
 
-    user, _ = User.objects.get_or_create(alice_user_id=alice_user_id)
-    User.objects.filter(telegram_user_id=telegram_user_id_str).exclude(pk=user.pk).update(telegram_user_id=None)
+    user, _ = AliceUser.objects.get_or_create(alice_user_id=alice_user_id)
+    AliceUser.objects.filter(telegram_user_id=telegram_user_id_str).exclude(pk=user.pk).update(telegram_user_id=None)
     user.telegram_user_id = telegram_user_id_str
     user.save()
 

@@ -5,14 +5,17 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
+from django.contrib.auth.models import User as DjangoUser
 
-from ..models import BloodPressureMeasurement, User
+from ..models import BloodPressureMeasurement, AliceUser
 
 
 class MeasurementsApiBasicCrudTests(APITestCase):
     def setUp(self):
         self.list_url = reverse("measurement-list")
-        self.user = User.objects.create(alice_user_id="test_user")
+        self.django_user = DjangoUser.objects.create_user(username='test_user', password='testpassword')
+        self.user = AliceUser.objects.create(user=self.django_user, alice_user_id="test_user")
+        self.client.login(username='test_user', password='testpassword')
 
     def test_list_empty_with_no_user_id(self):
         response = self.client.get(self.list_url)
@@ -44,7 +47,9 @@ class MeasurementsApiBasicCrudTests(APITestCase):
 class MeasurementsApiUpdateDeleteOrderingTests(APITestCase):
     def setUp(self):
         self.list_url = reverse("measurement-list")
-        self.user = User.objects.create(alice_user_id="test_user_ordering")
+        self.django_user = DjangoUser.objects.create_user(username='test_user_ordering', password='testpassword')
+        self.user = AliceUser.objects.create(user=self.django_user, alice_user_id="test_user_ordering")
+        self.client.login(username='test_user_ordering', password='testpassword')
 
     def test_update_and_delete(self):
         m = BloodPressureMeasurement.objects.create(user_id=self.user.alice_user_id, systolic=120, diastolic=80, pulse=65)
@@ -73,6 +78,8 @@ class MeasurementsApiUpdateDeleteOrderingTests(APITestCase):
 class MeasurementsApiValidationTests(APITestCase):
     def setUp(self):
         self.list_url = reverse("measurement-list")
+        self.django_user = DjangoUser.objects.create_user(username='validation_user', password='testpassword')
+        self.client.login(username='validation_user', password='testpassword')
 
     def test_validation_errors(self):
         # systolic must be > diastolic
@@ -89,10 +96,13 @@ class MeasurementsApiValidationTests(APITestCase):
 class MeasurementsApiTimezoneTests(APITestCase):
     def setUp(self):
         self.list_url = reverse("measurement-list")
-        self.user = User.objects.create(
+        self.django_user = DjangoUser.objects.create_user(username='test_user_for_tz', password='testpassword')
+        self.user = AliceUser.objects.create(
+            user=self.django_user,
             alice_user_id="test_user_for_tz",
             timezone="America/New_York"
         )
+        self.client.login(username='test_user_for_tz', password='testpassword')
         self.measurement = BloodPressureMeasurement.objects.create(
             user_id=self.user.alice_user_id,
             systolic=120,
@@ -119,3 +129,4 @@ class MeasurementsApiTimezoneTests(APITestCase):
         response_time_utc = measured_at_dt.astimezone(ZoneInfo("UTC"))
 
         self.assertAlmostEqual(original_utc_time, response_time_utc, delta=timedelta(seconds=1))
+

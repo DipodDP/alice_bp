@@ -32,7 +32,7 @@ class ViewErrorHandlingTest(APITestCase):
             self.assertEqual(response.data["status"], "error")
             self.assertEqual(response.data["message"], GenerateLinkTokenViewMessages.FAIL)
 
-    @patch('alice_skill.views.User.objects.filter')
+    @patch('alice_skill.views.AliceUser.objects.filter')
     def test_unlink_view_exception_handling(self, mock_user_filter):
         """
         Tests that UnlinkView handles exceptions during unlinking.
