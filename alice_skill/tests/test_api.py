@@ -44,3 +44,25 @@ class TestBloodPressureMeasurementAPI:
         assert response.status_code == 200
         assert len(response.data['results']) == 1
         assert response.data['results'][0]['systolic'] == 130
+
+    def test_get_measurements_as_bot(self):
+        from django.conf import settings # Import settings to get API_TOKEN
+        User = get_user_model()
+        bot_target_django_user = User.objects.create_user(username='bot_target_user', password='testpassword')
+        bot_target_alice_user = AliceUser.objects.create(user=bot_target_django_user, alice_user_id='bot_target_alice_id')
+        BloodPressureMeasurement.objects.create(
+            user_id=bot_target_alice_user.alice_user_id,
+            systolic=140,
+            diastolic=95,
+            pulse=80
+        )
+
+        # Make a request as a bot
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + settings.API_TOKEN)
+        response = self.client.get(f'/api/v1/measurements/?user_id={bot_target_alice_user.alice_user_id}')
+        self.client.credentials() # Clear credentials
+
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+        assert response.data['results'][0]['systolic'] == 140
+        assert response.data['results'][0]['user_id'] == bot_target_alice_user.alice_user_id

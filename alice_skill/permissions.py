@@ -14,7 +14,10 @@ class IsBot(BasePermission):
 
         try:
             _, token = auth_header.split()
-            return token == settings.API_TOKEN
+            if token == settings.API_TOKEN:
+                request.is_bot = True  # Set a flag on the request
+                return True
+            return False
         except (ValueError, AttributeError):
             return False
 

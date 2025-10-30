@@ -68,33 +68,52 @@ class AliceWebhookView(APIView):
 class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
     queryset = BloodPressureMeasurement.objects.all().order_by("-measured_at")
     serializer_class = BloodPressureMeasurementSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsBot | IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['user_id']
     ordering_fields = ['measured_at', 'systolic', 'diastolic', 'pulse']
 
     def get_queryset(self):
         user = self.request.user
+        is_bot_request = getattr(self.request, 'is_bot', False) # Check for the bot flag
+
+        # If the request is from a bot and user_id is provided
+        if is_bot_request and "user_id" in self.request.query_params:
+            user_id = self.request.query_params.get("user_id")
+            if user_id:
+                return self.queryset.filter(user_id=user_id)
+            return self.queryset.none() # If user_id is not provided, return empty for bot requests
+
+        # If the user is a superuser
         if user.is_superuser:
             user_id = self.request.query_params.get("user_id")
             if user_id:
                 return self.queryset.filter(user_id=user_id)
-            return self.queryset
+            return self.queryset # Superusers can see all if no user_id specified
 
-        try:
-            alice_user = AliceUser.objects.get(user=user)
-            return self.queryset.filter(user_id=alice_user.alice_user_id)
-        except AliceUser.DoesNotExist:
-            return self.queryset.none()
+        # For regular authenticated users
+        if user.is_authenticated: # Only proceed if authenticated
+            try:
+                alice_user = AliceUser.objects.get(user=user)
+                return self.queryset.filter(user_id=alice_user.alice_user_id)
+            except AliceUser.DoesNotExist:
+                return self.queryset.none()
+
+        # For unauthenticated users (not bots), return an empty queryset (permissions should handle 403)
+        return self.queryset.none()
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        try:
-            user = self.request.user
-            alice_user = AliceUser.objects.get(user=user)
-            context['timezone'] = alice_user.timezone
-        except (AliceUser.DoesNotExist, AttributeError):
-            pass
+        user = self.request.user
+        if user.is_authenticated: # Add this check
+            try:
+                alice_user = AliceUser.objects.get(user=user)
+                context["alice_user"] = alice_user
+                # Add timezone to context if available
+                if alice_user.timezone:
+                    context["timezone"] = alice_user.timezone
+            except AliceUser.DoesNotExist:
+                pass # Or handle this case as needed, perhaps by not adding alice_user to context
         return context
 
 

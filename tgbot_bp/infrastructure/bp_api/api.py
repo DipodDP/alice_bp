@@ -44,7 +44,7 @@ class BloodPressureApi(BaseClient):
         try:
             _, data = await self._make_request(
                 method="GET",
-                url="/measurements/",
+                url="/api/v1/measurements/",
                 params={
                     "user_id": user_id,
                     "created_at__gte": start_date,
@@ -63,7 +63,7 @@ class BloodPressureApi(BaseClient):
         try:
             _, data = await self._make_request(
                 method="GET",
-                url="/measurements/",
+                url="/api/v1/measurements/",
                 params={"user_id": user_id, "ordering": "-created_at"},
                 headers=self._auth_headers(),
             )
