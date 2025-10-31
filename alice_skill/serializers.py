@@ -14,7 +14,7 @@ class AliceUserSerializer(serializers.ModelSerializer):
 
 
 class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
-    user_id = serializers.CharField(required=True, allow_blank=False)
+    user = serializers.PrimaryKeyRelatedField(queryset=AliceUser.objects.all())
     MIN_SYSTOLIC = 50
     MAX_SYSTOLIC = 300
     MIN_DIASTOLIC = 30
@@ -69,7 +69,7 @@ class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BloodPressureMeasurement
-        fields = ["user_id", "systolic", "diastolic", "pulse", "measured_at"]
+        fields = ["user", "systolic", "diastolic", "pulse", "measured_at"]
 
 
 class NLUObjectSerializer(serializers.Serializer):

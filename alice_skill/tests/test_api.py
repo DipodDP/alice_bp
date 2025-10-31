@@ -11,7 +11,7 @@ class TestBloodPressureMeasurementAPI:
         self.django_user = User.objects.create_user(username='test_alice_id', password='testpassword')
         self.alice_user = AliceUser.objects.create(user=self.django_user, alice_user_id='test_alice_id')
         self.measurement = BloodPressureMeasurement.objects.create(
-            user_id=self.alice_user.alice_user_id,
+            user=self.alice_user,
             systolic=120,
             diastolic=80,
             pulse=60
@@ -33,7 +33,7 @@ class TestBloodPressureMeasurementAPI:
         other_django_user = User.objects.create_user(username='otheruser', password='testpassword')
         other_alice_user = AliceUser.objects.create(user=other_django_user, alice_user_id='other_alice_id')
         BloodPressureMeasurement.objects.create(
-            user_id=other_alice_user.alice_user_id,
+            user=other_alice_user,
             systolic=130,
             diastolic=90,
             pulse=70
@@ -51,7 +51,7 @@ class TestBloodPressureMeasurementAPI:
         bot_target_django_user = User.objects.create_user(username='bot_target_user', password='testpassword')
         bot_target_alice_user = AliceUser.objects.create(user=bot_target_django_user, alice_user_id='bot_target_alice_id')
         BloodPressureMeasurement.objects.create(
-            user_id=bot_target_alice_user.alice_user_id,
+            user=bot_target_alice_user,
             systolic=140,
             diastolic=95,
             pulse=80
@@ -65,4 +65,4 @@ class TestBloodPressureMeasurementAPI:
         assert response.status_code == 200
         assert len(response.data['results']) == 1
         assert response.data['results'][0]['systolic'] == 140
-        assert response.data['results'][0]['user_id'] == bot_target_alice_user.alice_user_id
+        assert response.data['results'][0]['user'] == bot_target_alice_user.pk

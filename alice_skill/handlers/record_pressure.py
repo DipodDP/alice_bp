@@ -74,7 +74,7 @@ class RecordPressureHandler(BaseAliceHandler):
             user.save(update_fields=["timezone"])
             logger.info(f"Updated timezone for user {user_id} to {user_timezone_str}")
 
-        payload = {"user_id": user_id, "systolic": systolic, "diastolic": diastolic}
+        payload = {"user": user.pk, "systolic": systolic, "diastolic": diastolic}
         if pulse is not None:
             payload["pulse"] = pulse
 

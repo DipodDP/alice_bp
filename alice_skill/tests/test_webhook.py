@@ -8,7 +8,7 @@ from ..messages import (
     LastMeasurementMessages,
     RecordPressureMessages,
 )
-from ..models import BloodPressureMeasurement
+from ..models import BloodPressureMeasurement, AliceUser
 
 
 @override_settings(ALICE_WEBHOOK_SECRET="test-secret")
@@ -32,7 +32,8 @@ class AliceWebhookViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(BloodPressureMeasurement.objects.count(), 1)
         measurement = BloodPressureMeasurement.objects.first()
-        self.assertEqual(measurement.user_id, "test-user")
+        user = AliceUser.objects.get(alice_user_id="test-user")
+        self.assertEqual(measurement.user, user)
         self.assertEqual(measurement.systolic, 130)
         self.assertEqual(measurement.diastolic, 75)
         expected_response = {
@@ -85,8 +86,9 @@ class AliceWebhookViewTest(APITestCase):
         self.assertEqual(response.data["version"], payload["version"])
 
     def test_last_measurement_with_record(self):
+        user = AliceUser.objects.create(alice_user_id="u2")
         BloodPressureMeasurement.objects.create(
-            user_id="u2", systolic=120, diastolic=80, pulse=70
+            user=user, systolic=120, diastolic=80, pulse=70
         )
         payload = {
             "meta": {"timezone": "UTC"},

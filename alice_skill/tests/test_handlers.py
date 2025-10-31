@@ -9,7 +9,7 @@ from ..messages import (
     RecordPressureMessages,
 )
 
-from ..models import BloodPressureMeasurement
+from ..models import BloodPressureMeasurement, AliceUser
 from ..handlers.record_pressure import RecordPressureHandler
 from ..handlers.last_measurement import LastMeasurementHandler
 from .factories import TestDataFactory
@@ -51,6 +51,7 @@ class LastMeasurementHandlerTest(TestCase):
     def setUp(self):
         self.handler = LastMeasurementHandler()
         self.factory = TestDataFactory()
+        self.user = AliceUser.objects.create(alice_user_id='u')
 
     @mock.patch("django.utils.timezone.now")
     def test_handle_with_measurements(self, mock_now):
@@ -59,14 +60,14 @@ class LastMeasurementHandlerTest(TestCase):
         mock_now.return_value = fixed_now
         # Create test measurements
         self.factory.create_measurement(
-            user_id="u",
+            user=self.user,
             systolic=120,
             diastolic=80,
             pulse=70,
             measured_at=mock_now.return_value - timedelta(minutes=10),
         )
         self.factory.create_measurement(
-            user_id="u",
+            user=self.user,
             systolic=130,
             diastolic=85,
             pulse=75,
@@ -91,7 +92,7 @@ class LastMeasurementHandlerTest(TestCase):
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
         mock_now.return_value = fixed_now
         self.factory.create_measurement(
-            user_id="u",
+            user=self.user,
             systolic=110,
             diastolic=70,
             pulse=None,
@@ -127,7 +128,7 @@ class LastMeasurementHandlerTest(TestCase):
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
         mock_now.return_value = fixed_now
         self.factory.create_measurement(
-            user_id="u", systolic=120, diastolic=80, measured_at=mock_now.return_value
+            user=self.user, systolic=120, diastolic=80, measured_at=mock_now.return_value
         )
 
         validated_request_data = self.factory.create_validated_request_data(
@@ -144,7 +145,7 @@ class LastMeasurementHandlerTest(TestCase):
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
         mock_now.return_value = fixed_now
         self.factory.create_measurement(
-            user_id="u", systolic=125, diastolic=82, measured_at=mock_now.return_value
+            user=self.user, systolic=125, diastolic=82, measured_at=mock_now.return_value
         )
 
         validated_request_data = self.factory.create_validated_request_data(
@@ -163,7 +164,7 @@ class LastMeasurementHandlerTest(TestCase):
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
         mock_now.return_value = fixed_now
         self.factory.create_measurement(
-            user_id="u", systolic=115, diastolic=75, measured_at=mock_now.return_value
+            user=self.user, systolic=115, diastolic=75, measured_at=mock_now.return_value
         )
 
         validated_request_data = self.factory.create_validated_request_data(
@@ -204,7 +205,7 @@ class LastMeasurementHandlerTest(TestCase):
                 BloodPressureMeasurement.objects.all().delete()
                 measurement_time = mock_now.return_value - delta
                 self.factory.create_measurement(
-                    user_id="u",
+                    user=self.user,
                     systolic=120,
                     diastolic=80,
                     measured_at=measurement_time,

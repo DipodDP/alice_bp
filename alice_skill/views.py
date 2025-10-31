@@ -70,7 +70,8 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
     serializer_class = BloodPressureMeasurementSerializer
     permission_classes = [IsBot | IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['user_id']
+    filterset_fields = ['user']
+    search_fields = ['alice_user_id']
     ordering_fields = ['measured_at', 'systolic', 'diastolic', 'pulse']
 
     def get_queryset(self):
@@ -81,21 +82,21 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
         if is_bot_request and "user_id" in self.request.query_params:
             user_id = self.request.query_params.get("user_id")
             if user_id:
-                return self.queryset.filter(user_id=user_id)
+                return self.queryset.filter(user__alice_user_id=user_id)
             return self.queryset.none() # If user_id is not provided, return empty for bot requests
 
         # If the user is a superuser
         if user.is_superuser:
             user_id = self.request.query_params.get("user_id")
             if user_id:
-                return self.queryset.filter(user_id=user_id)
+                return self.queryset.filter(user__alice_user_id=user_id)
             return self.queryset # Superusers can see all if no user_id specified
 
         # For regular authenticated users
         if user.is_authenticated: # Only proceed if authenticated
             try:
                 alice_user = AliceUser.objects.get(user=user)
-                return self.queryset.filter(user_id=alice_user.alice_user_id)
+                return self.queryset.filter(user=alice_user)
             except AliceUser.DoesNotExist:
                 return self.queryset.none()
 
@@ -175,7 +176,7 @@ class UserByTelegramView(APIView):
     """
     Retrieves a user by their Telegram ID.
     """
-    permission_classes = [IsBot]  # In production, should be protected
+    permission_classes = [IsBot]
 
     def get(self, request, telegram_id, *args, **kwargs):
         try:

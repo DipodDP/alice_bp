@@ -2,7 +2,7 @@ import logging
 
 from ..messages import LastMeasurementMessages
 from .base import BaseAliceHandler
-from ..models import BloodPressureMeasurement
+from ..models import BloodPressureMeasurement, AliceUser
 from ..serializers import BloodPressureMeasurementSerializer
 from ..helpers import format_measured_at
 from django.utils import timezone
@@ -33,8 +33,14 @@ class LastMeasurementHandler(BaseAliceHandler):
         user_id = session.get("user_id")
         if not user_id:
             return LastMeasurementMessages.NO_RECORDS
+
+        try:
+            user = AliceUser.objects.get(alice_user_id=user_id)
+        except AliceUser.DoesNotExist:
+            return LastMeasurementMessages.NO_RECORDS
+
         last = (
-            BloodPressureMeasurement.objects.filter(user_id=user_id)
+            BloodPressureMeasurement.objects.filter(user=user)
             .order_by("-measured_at")
             .first()
         )

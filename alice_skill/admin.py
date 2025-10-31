@@ -4,9 +4,9 @@ from .models import BloodPressureMeasurement, AliceUser, AccountLinkToken
 
 @admin.register(BloodPressureMeasurement)
 class BloodPressureMeasurementAdmin(admin.ModelAdmin):
-    list_display = ("user_id", "systolic", "diastolic", "measured_at")
-    list_filter = ("user_id", "measured_at")
-    search_fields = ("user_id", "systolic", "diastolic")
+    list_display = ("user", "systolic", "diastolic", "measured_at")
+    list_filter = ("user", "measured_at")
+    search_fields = ("user__alice_user_id", "systolic", "diastolic")
 
 
 @admin.register(AliceUser)

@@ -16,7 +16,7 @@ class AliceUser(models.Model):
 
 
 class BloodPressureMeasurement(models.Model):
-    user_id = models.CharField(max_length=255, db_index=True)
+    user = models.ForeignKey(AliceUser, on_delete=models.CASCADE, related_name='measurements')
     systolic = models.IntegerField()
     diastolic = models.IntegerField()
     pulse = models.IntegerField(null=True, blank=True)
@@ -42,4 +42,3 @@ class AccountLinkToken(models.Model):
 
     def __str__(self):
         return f"Token for Telegram User {self.telegram_user_id} (Used: {self.used})"
-
