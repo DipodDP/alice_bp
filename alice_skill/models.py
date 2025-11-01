@@ -24,6 +24,10 @@ class BloodPressureMeasurement(models.Model):
 
     class Meta:
         ordering = ['-measured_at']
+        indexes = [
+            # Composite index for filtering by user and ordering by measured_at
+            models.Index(fields=['user', '-measured_at'], name='bp_user_time_idx'),
+        ]
 
     def __str__(self):
         return f"BP: {self.systolic}/{self.diastolic} at {self.measured_at.strftime('%Y-%m-%d %H:%M')}"

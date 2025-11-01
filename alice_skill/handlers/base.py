@@ -1,3 +1,6 @@
+from ..helpers import replace_latin_homoglyphs
+
+
 class BaseAliceHandler:
     """Common utilities for Alice skill handlers."""
 
@@ -6,7 +9,7 @@ class BaseAliceHandler:
         # Prefer original_utterance, then fallback to command
         utterance = (req.get("original_utterance") or req.get("command") or "").strip()
         # Normalize common ASR errors where Latin characters are confused with Cyrillic
-        utterance = utterance.replace('a', 'а').replace('e', 'е').replace('o', 'о').replace('p', 'р').replace('c', 'с').replace('x', 'х').replace('y', 'у')
+        utterance = replace_latin_homoglyphs(utterance)
         return utterance
 
     def get_nlu_tokens(self, validated_request_data: dict) -> list[str]:

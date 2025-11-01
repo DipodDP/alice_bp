@@ -3,6 +3,7 @@ import re
 import secrets
 import hmac
 from . import messages
+from .helpers import replace_latin_homoglyphs
 from .models import AliceUser, AccountLinkToken
 from .wordlist import WORDLIST
 from django.conf import settings
@@ -72,8 +73,8 @@ def _normalize_nlu_tokens(nlu_tokens: list[str]) -> list[str]:
         sub_tokens = token.split(' ')
         for sub_token in sub_tokens:
             word = sub_token.lower().replace('ё', 'е')
-            # Homoglyph replacement
-            word = word.replace('a', 'а').replace('e', 'е').replace('o', 'о').replace('p', 'р').replace('c', 'с').replace('x', 'х').replace('y', 'у')
+            # Homoglyph replacement using utility function
+            word = replace_latin_homoglyphs(word)
 
             if re.match(r'^[а-яё]+-\d{3}$', word):
                 normalized_tokens.append(word)

@@ -98,5 +98,3 @@ class RecordPressureHandler(BaseAliceHandler):
             f"RecordPressureHandler: Invalid measurement data: {serializer.errors}"
         )
         return RecordPressureMessages.INVALID
-
-        return

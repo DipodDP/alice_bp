@@ -5,6 +5,28 @@ from zoneinfo import ZoneInfo
 from .messages import DateFormattingMessages
 
 
+def replace_latin_homoglyphs(text: str) -> str:
+    """
+    Replaces Latin characters that look like Cyrillic with their Cyrillic equivalents.
+    This handles common ASR errors where Latin characters are confused with Cyrillic.
+
+    Args:
+        text: Input string that may contain Latin homoglyphs
+
+    Returns:
+        String with Latin homoglyphs replaced by Cyrillic characters
+    """
+    return (
+        text.replace('a', 'а')
+        .replace('e', 'е')
+        .replace('o', 'о')
+        .replace('p', 'р')
+        .replace('c', 'с')
+        .replace('x', 'х')
+        .replace('y', 'у')
+    )
+
+
 def normalize_spoken_token(tokens: list[str]) -> str:
     """
     Normalizes a list of spoken tokens into a canonical three-word string.
@@ -19,16 +41,8 @@ def normalize_spoken_token(tokens: list[str]) -> str:
         word = token.lower()
         # Replace 'ё' with 'е'
         word = word.replace("ё", "е")
-        # Replace Latin lookalikes (basic set)
-        word = (
-            word.replace("a", "а")
-            .replace("e", "е")
-            .replace("o", "о")
-            .replace("p", "р")
-            .replace("c", "с")
-            .replace("x", "х")
-            .replace("y", "у")
-        )
+        # Replace Latin lookalikes using utility function
+        word = replace_latin_homoglyphs(word)
         # Remove all non-Cyrillic characters (including punctuation, numbers, etc.)
         word = re.sub(r"[^а-я]", "", word)
         if word:

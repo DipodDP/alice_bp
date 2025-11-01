@@ -1,8 +1,11 @@
 import logging
 
+from django.db import connection
 from rest_framework import viewsets, status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
@@ -30,6 +33,29 @@ from .handlers.last_measurement import LastMeasurementHandler
 from .pagination import CustomPageNumberPagination
 
 logger = logging.getLogger(__name__)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    """
+    Health check endpoint for monitoring and load balancers.
+    Returns 200 OK if service is healthy, 503 if database is unreachable.
+    """
+    try:
+        # Check database connectivity
+        connection.ensure_connection()
+        return Response({
+            'status': 'healthy',
+            'database': 'connected'
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return Response({
+            'status': 'unhealthy',
+            'database': 'disconnected',
+            'error': str(e)
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 class AliceWebhookView(APIView):
@@ -72,9 +98,11 @@ class AliceWebhookView(APIView):
 
 
 class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
-    queryset = BloodPressureMeasurement.objects.all().order_by("-measured_at")
+    # Use select_related to avoid N+1 queries when accessing user relationship
+    queryset = BloodPressureMeasurement.objects.select_related('user').order_by("-measured_at")
     serializer_class = BloodPressureMeasurementSerializer
     permission_classes = [IsBot | IsAuthenticated]
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ["user"]
     search_fields = ["alice_user_id"]
@@ -106,7 +134,7 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
         # For regular authenticated users
         if user.is_authenticated:  # Only proceed if authenticated
             try:
-                alice_user = AliceUser.objects.get(user=user)
+                alice_user = AliceUser.objects.select_related('user').get(user=user)
                 return self.queryset.filter(user=alice_user)
             except AliceUser.DoesNotExist:
                 return self.queryset.none()
@@ -119,7 +147,7 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_authenticated:  # Add this check
             try:
-                alice_user = AliceUser.objects.get(user=user)
+                alice_user = AliceUser.objects.select_related('user').get(user=user)
                 context["alice_user"] = alice_user
                 # Add timezone to context if available
                 if alice_user.timezone:
@@ -132,13 +160,26 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
 class LinkStatusView(APIView):
     """
     Checks the linking status of a user from either platform.
+
+    Security Note: This endpoint uses AllowAny permission to allow both
+    Alice and Telegram bot to check link status. Rate limiting is applied
+    to prevent abuse. Consider adding IP-based restrictions or moving to
+    IsBot permission for production deployments.
     """
 
     permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]
 
     def post(self, request, *args, **kwargs):
         alice_user_id = request.data.get("session", {}).get("user_id")
         telegram_user_id = request.data.get("telegram_user_id")
+
+        # Validate that at least one identifier is provided
+        if not alice_user_id and not telegram_user_id:
+            return Response(
+                {"status": "error", "message": ViewMessages.UNABLE_TO_IDENTIFY_USER},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         user = None
         if alice_user_id:
@@ -169,14 +210,30 @@ class LinkStatusView(APIView):
 class UnlinkView(APIView):
     """
     Handles unlinking a user account from either platform.
+
+    Security Note: This endpoint uses AllowAny permission to allow both
+    Alice and Telegram bot to unlink accounts. Rate limiting is applied
+    to prevent abuse. Consider adding additional authentication or audit
+    logging for production deployments.
     """
 
     permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]
 
     def post(self, request, *args, **kwargs):
         try:
             alice_user_id = request.data.get("session", {}).get("user_id")
             telegram_user_id = request.data.get("telegram_user_id")
+
+            # Validate that at least one identifier is provided
+            if not alice_user_id and not telegram_user_id:
+                return Response(
+                    {
+                        "status": "error",
+                        "message": ViewMessages.UNABLE_TO_IDENTIFY_USER,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             user = None
             if alice_user_id:
@@ -185,14 +242,6 @@ class UnlinkView(APIView):
                 user = AliceUser.objects.filter(
                     telegram_user_id=telegram_user_id
                 ).first()
-            else:
-                return Response(
-                    {
-                        "status": "error",
-                        "message": ViewMessages.UNABLE_TO_IDENTIFY_USER,
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
 
             if user and user.telegram_user_id:
                 user.telegram_user_id = None
@@ -236,9 +285,12 @@ class UserByTelegramView(APIView):
 class GenerateLinkTokenView(APIView):
     """
     Generates a linking token for a Telegram user.
+    Note: This view already has application-level rate limiting in generate_link_token().
+    DRF throttling provides an additional layer of protection.
     """
 
-    permission_classes = [IsBot]  # TODO: Add proper authentication for Telegram bot
+    permission_classes = [IsBot]
+    throttle_classes = [UserRateThrottle]
 
     def post(self, request, *args, **kwargs):
         telegram_user_id = request.data.get("telegram_user_id")
