@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 from django.urls import reverse
 from django.utils import timezone
+from alice_skill.tests.factories import TestDataFactory
 from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth.models import User as DjangoUser
@@ -42,6 +43,41 @@ class MeasurementsApiBasicCrudTests(APITestCase):
         self.assertEqual(detail_resp.data["systolic"], 125)
         self.assertEqual(detail_resp.data["diastolic"], 82)
         self.assertEqual(detail_resp.data["pulse"], 70)
+
+    def test_unauthenticated_access_denied(self):
+        self.client.logout()
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_bot_access_without_user_id_returns_empty(self):
+        self.client.logout() # Ensure not authenticated as a regular user
+        bot_token = 'test_bot_token'
+        with self.settings(API_TOKEN=bot_token):
+            response = self.client.get(self.list_url, HTTP_AUTHORIZATION=f'Bearer {bot_token}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'], [])
+
+    def test_superuser_access_without_user_id_returns_all_measurements(self):
+        # Create a measurement for the current user
+        TestDataFactory.create_measurement(user=self.user, systolic=130, diastolic=85)
+
+        # Create another user and some measurements for them
+        other_django_user = DjangoUser.objects.create_user(username='other_user', password='testpassword')
+        other_alice_user = AliceUser.objects.create(user=other_django_user, alice_user_id="other_user")
+        TestDataFactory.create_measurement(user=other_alice_user, systolic=110, diastolic=70)
+
+        # Make the current user a superuser
+        self.django_user.is_superuser = True
+        self.django_user.save()
+
+        # Log in as superuser
+        self.client.force_authenticate(user=self.django_user)
+
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Expect 2 measurements: one from self.user, one from other_alice_user
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(len(response.data['results']), 2)
 
 
 class MeasurementsApiUpdateDeleteOrderingTests(APITestCase):
@@ -119,15 +155,38 @@ class MeasurementsApiTimezoneTests(APITestCase):
         self.assertEqual(len(response.data['results']), 1)
 
         measured_at_str = response.data['results'][0]["measured_at"]
-        measured_at_dt = datetime.fromisoformat(measured_at_str)
+        # Use strptime with the explicit format to ensure timezone awareness
+        measured_at_dt = datetime.strptime(measured_at_str, "%Y-%m-%dT%H:%M:%S.%f%z")
 
         # Check that the timezone is correct
         ny_tz = ZoneInfo("America/New_York")
-        self.assertEqual(measured_at_dt.tzinfo.utcoffset(None), ny_tz.utcoffset(datetime.now()))
+        # Convert to New York timezone and then compare the timezone info
+        converted_dt = measured_at_dt.astimezone(ny_tz)
+        self.assertEqual(converted_dt.tzinfo, ny_tz)
 
         # Check that the time is correct by comparing with original UTC time
         original_utc_time = self.measurement.measured_at.astimezone(ZoneInfo("UTC"))
         response_time_utc = measured_at_dt.astimezone(ZoneInfo("UTC"))
 
         self.assertAlmostEqual(original_utc_time, response_time_utc, delta=timedelta(seconds=1))
+
+    def test_measurements_pagination(self):
+        # Create more measurements than the default page size
+        for _ in range(15):
+            TestDataFactory.create_measurement(user=self.user, systolic=120, diastolic=80)
+
+        # Test default page size
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 10)  # Default page size
+
+        # Test custom page size
+        response = self.client.get(f"{self.list_url}?page_size=5")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 5)
+
+        # Test custom page size larger than default
+        response = self.client.get(f"{self.list_url}?page_size=20")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 16) # Should return all 16 measurements
 

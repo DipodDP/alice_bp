@@ -1,11 +1,11 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any  # noqa: F401 (imported for potential future annotations)
 
 from aiogram_dialog import DialogManager
 from infrastructure.bp_api.api import BloodPressureApi
 from tgbot.messages.dialogs_msg import UserDialogMessages
+from .cache_utils import dialog_data_cache
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,11 @@ async def get_time_interval(dialog_manager: DialogManager, **kwargs):
     }
 
 
-async def get_measurements_data(dialog_manager: DialogManager, bp_api: BloodPressureApi, **kwargs):
-    """Get pressure measurements data for the selected interval."""
+@dialog_data_cache("measurements_data")
+async def _fetch_and_process_measurements_data(
+    dialog_manager: DialogManager, bp_api: BloodPressureApi, **kwargs
+):
+    """Core logic for fetching and processing pressure measurements data."""
     telegram_user_id = str(dialog_manager.event.from_user.id)
     selected_interval = dialog_manager.dialog_data.get("selected_interval", 0)
 
@@ -87,15 +90,25 @@ async def get_measurements_data(dialog_manager: DialogManager, bp_api: BloodPres
         start_date_str = start_date.strftime("%Y-%m-%d")
         end_date_str = end_date.strftime("%Y-%m-%d")
 
-        # Get measurements from Django API via infrastructure client
-        items = await bp_api.get_measurements(
-            user_id=alice_user_id, start_date=start_date_str, end_date=end_date_str
-        )
+        # Get all measurements from Django API via infrastructure client
+        all_measurements = []
+        page = 1
+        page_size = 100  # Fetch a max number of items per page
+        while True:
+            items, total_count, next_url = await bp_api.get_measurements(
+                user_id=alice_user_id,
+                start_date=start_date_str,
+                end_date=end_date_str,
+                page=page,
+                page_size=page_size,
+            )
+            all_measurements.extend(items)
+            if not next_url:
+                break
+            page += 1
 
-        # The original code had a redundant date filter here. The API call already filters by date.
-        # We just need to process the items.
         processed_measurements = []
-        for item in items:
+        for item in all_measurements:
             try:
                 measured_at: str = item.get("measured_at", "")
                 dt = datetime.fromisoformat(measured_at.replace("Z", "+00:00"))
@@ -131,7 +144,7 @@ async def get_measurements_data(dialog_manager: DialogManager, bp_api: BloodPres
             if pulse_measurements:
                 avg_pulse = sum(pulse_measurements) / len(pulse_measurements)
 
-            return {
+            result = {
                 "measurements": processed_measurements,
                 "total_count": len(processed_measurements),
                 "avg_systolic": round(avg_systolic, 1),
@@ -142,16 +155,18 @@ async def get_measurements_data(dialog_manager: DialogManager, bp_api: BloodPres
                 "start_date": start_date_str,
                 "end_date": end_date_str,
             }
+            return result
         else:
             # No measurements found for the period or all failed to parse
-            if items:
+            if all_measurements:
                 error_data["error"] = UserDialogMessages.MEASUREMENT_PROCESSING_ERROR
-            return {
+            result = {
                 **error_data,
                 "has_data": False,
                 "start_date": start_date_str,
                 "end_date": end_date_str,
             }
+            return result
 
     except Exception as e:
         logger.error(f"Error fetching pressure data: {e}")
@@ -163,3 +178,10 @@ def get_period_label(interval: int) -> str:
     """Get human-readable period label."""
     labels = {0: "за последнюю неделю", 1: "за прошлую неделю", 2: "за последний месяц"}
     return labels.get(interval, "за выбранный период")
+
+
+async def get_measurements_data(
+    dialog_manager: DialogManager, bp_api: BloodPressureApi, **kwargs
+):
+    """Get pressure measurements data for the selected interval."""
+    return await _fetch_and_process_measurements_data(dialog_manager, bp_api, **kwargs)

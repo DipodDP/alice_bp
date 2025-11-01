@@ -15,6 +15,7 @@ class AliceUserSerializer(serializers.ModelSerializer):
 
 class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=AliceUser.objects.all())
+    measured_at = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%S%z", required=False, allow_null=True)
     MIN_SYSTOLIC = 50
     MAX_SYSTOLIC = 300
     MIN_DIASTOLIC = 30

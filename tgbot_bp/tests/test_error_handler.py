@@ -32,7 +32,9 @@ def mock_dialog_manager():
 
 
 @pytest.mark.asyncio
-async def test_on_unknown_intent(mock_error_event_with_callback_query, mock_dialog_manager):
+async def test_on_unknown_intent(
+    mock_error_event_with_callback_query, mock_dialog_manager
+):
     await on_unknown_intent(mock_error_event_with_callback_query, mock_dialog_manager)
 
     mock_error_event_with_callback_query.update.callback_query.answer.assert_called_once_with(

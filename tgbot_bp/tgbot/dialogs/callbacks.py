@@ -8,6 +8,7 @@ from tgbot.keyboards.reply import user_menu_keyboard
 from tgbot.messages.handlers_msg import UserHandlerMessages
 from tgbot.dialogs.states import MainMenu
 from tgbot.services.utils import delete_prev_message
+from tgbot.dialogs.cache_utils import clear_dialog_data_cache
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ async def set_prev_message(
     await state.update_data(prev_bot_message=callback_query.message)
 
 
+@clear_dialog_data_cache("measurements_data")
 async def selected_interval(
     callback_query: CallbackQuery,
     widget: Select,

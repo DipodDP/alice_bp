@@ -44,7 +44,7 @@ user_menu_dialog = Dialog(
             Const(UserDialogButtons.GET_REPORT),
             id="get_report",
             state=MainMenu.interval_selection,
-            on_click=set_prev_message
+            on_click=set_prev_message,
         ),
         state=MainMenu.main,
     ),
