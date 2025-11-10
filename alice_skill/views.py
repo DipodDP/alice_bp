@@ -1,13 +1,14 @@
 import logging
+from datetime import datetime, timedelta
 
 from django.db import connection
+from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 
 from .messages import (
@@ -120,8 +121,7 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
     serializer_class = BloodPressureMeasurementSerializer
     permission_classes = [IsBot | IsAuthenticated]
     throttle_classes = [AnonRateThrottle, UserRateThrottle]
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['user']
+    filter_backends = [OrderingFilter]
     search_fields = ['alice_user_id']
     ordering_fields = ['measured_at', 'systolic', 'diastolic', 'pulse']
     pagination_class = CustomPageNumberPagination
@@ -130,6 +130,36 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
         """
         Dynamically filters the queryset based on the user type and query parameters.
         """
+        queryset = self.queryset
+
+        # Date range filtering from query parameters
+        start_date = self.request.query_params.get('created_at__gte')
+        end_date = self.request.query_params.get('created_at__lte')
+
+        if start_date:
+            try:
+                # Parse YYYY-MM-DD format and convert to timezone-aware datetime at start of day
+                start_date_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+                start_datetime = timezone.make_aware(
+                    datetime.combine(start_date_dt, datetime.min.time())
+                )
+                queryset = queryset.filter(measured_at__gte=start_datetime)
+            except ValueError:
+                # Fallback for other formats, though less precise
+                queryset = queryset.filter(measured_at__gte=start_date)
+        if end_date:
+            try:
+                # Assuming YYYY-MM-DD format, make the filter inclusive of the whole day
+                end_date_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+                end_date_inclusive = end_date_dt + timedelta(days=1)
+                end_datetime = timezone.make_aware(
+                    datetime.combine(end_date_inclusive, datetime.min.time())
+                )
+                queryset = queryset.filter(measured_at__lt=end_datetime)
+            except ValueError:
+                # Fallback for other formats, though less precise
+                queryset = queryset.filter(measured_at__lte=end_date)
+
         user = self.request.user
         is_bot_request = getattr(self.request, 'is_bot', False)
 
@@ -137,7 +167,7 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
         if is_bot_request:
             user_id = self.request.query_params.get('user_id')
             if user_id:
-                return self.queryset.filter(user__alice_user_id=user_id)
+                return queryset.filter(user__alice_user_id=user_id)
             # If user_id is not provided for a bot request, return no results
             return self.queryset.none()
 
@@ -145,16 +175,16 @@ class BloodPressureMeasurementViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             user_id = self.request.query_params.get('user_id')
             if user_id:
-                return self.queryset.filter(user__alice_user_id=user_id)
+                return queryset.filter(user__alice_user_id=user_id)
             # Superusers can see all measurements if no user_id is specified
-            return self.queryset
+            return queryset
 
         # Case 3: Regular authenticated user
         if user.is_authenticated:
             try:
                 # Retrieve the AliceUser associated with the Django user
                 alice_user = AliceUser.objects.select_related('user').get(user=user)
-                return self.queryset.filter(user=alice_user)
+                return queryset.filter(user=alice_user)
             except AliceUser.DoesNotExist:
                 # If no AliceUser is linked, return no results
                 return self.queryset.none()

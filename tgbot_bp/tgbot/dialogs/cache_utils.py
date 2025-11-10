@@ -47,7 +47,7 @@ def dialog_data_cache(key_prefix: str):
 def clear_dialog_data_cache(key_prefix: str):
     """
     A decorator to clear a specific cached entry from `dialog_manager.dialog_data`
-    after the decorated function (e.g., a callback) has executed.
+    before the decorated function (e.g., a callback) is executed.
 
     The cache key is constructed using a `key_prefix` and the Telegram user ID.
 
@@ -55,7 +55,7 @@ def clear_dialog_data_cache(key_prefix: str):
         key_prefix (str): The prefix used to construct the cache key.
 
     Returns:
-        Callable: A decorator that clears the cache after the decorated function.
+        Callable: A decorator that clears the cache before the decorated function.
     """
 
     def decorator(func):
@@ -67,14 +67,15 @@ def clear_dialog_data_cache(key_prefix: str):
             item_id: str,
             **kwargs,
         ):
-            # Execute the original function first
-            await func(callback_query, widget, dialog_manager, item_id, **kwargs)
-            # Then clear the cache
+            # Clear the cache first
             telegram_user_id = str(dialog_manager.event.from_user.id)
             cache_key = f"{key_prefix}_{telegram_user_id}"
             if cache_key in dialog_manager.dialog_data:
                 del dialog_manager.dialog_data[cache_key]
                 logger.debug(f"Cleared cache for {cache_key}")
+
+            # Then execute the original function
+            await func(callback_query, widget, dialog_manager, item_id, **kwargs)
 
         return wrapper
 
