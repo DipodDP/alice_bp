@@ -137,6 +137,54 @@ This project now includes a link between the Django `User` model and the Alice `
 
 Access to the `/api/v1/measurements/` endpoint is restricted to authenticated Django users. Users can only view their own measurements. Superusers can view all measurements.
 
+## Management Commands
+
+This project includes custom management commands to help with user administration.
+
+### `check_user_timezone`
+
+Check the timezone for a user by their Alice User ID or Telegram User ID.
+
+**Usage:**
+
+```bash
+uv run manage.py check_user_timezone --alice-user-id <alice_user_id>
+```
+
+or
+
+```bash
+uv run manage.py check_user_timezone --telegram-user-id <telegram_user_id>
+```
+
+You can also list all users and their timezones:
+
+```bash
+uv run manage.py check_user_timezone --list-all
+```
+
+### `update_user_timezone`
+
+Update the timezone for a user.
+
+**Usage:**
+
+```bash
+uv run manage.py update_user_timezone --alice-user-id <alice_user_id> --timezone <timezone>
+```
+
+or
+
+```bash
+uv run manage.py update_user_timezone --telegram-user-id <telegram_user_id> --timezone <timezone>
+```
+
+Example:
+
+```bash
+uv run manage.py update_user_timezone --alice-user-id "some_long_id" --timezone "Europe/Moscow"
+```
+
 ## Getting Started
 
 ### Prerequisites

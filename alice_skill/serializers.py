@@ -58,14 +58,17 @@ class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         tz_str = self.context.get("timezone")
 
-        if tz_str:
+        # Handle timezone conversion - tz_str should be a non-empty string
+        if tz_str and tz_str.strip():
             try:
-                tz = ZoneInfo(tz_str)
+                tz = ZoneInfo(tz_str.strip())
                 measured_at_dt = instance.measured_at
                 if measured_at_dt:
+                    # Convert to user's timezone
                     representation["measured_at"] = measured_at_dt.astimezone(tz).isoformat()
             except ZoneInfoNotFoundError:
-                pass  # Ignore invalid timezone, use default serialization
+                # Invalid timezone, use default serialization (UTC)
+                pass
         return representation
 
     class Meta:

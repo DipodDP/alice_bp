@@ -23,3 +23,5 @@ dev = [
 members = [
     "tgbot_bp",
 ]
+[tool.ruff.format]
+quote-style = "single"
