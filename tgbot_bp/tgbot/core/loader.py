@@ -53,6 +53,7 @@ def get_storage(config: Config):
     if config.tg_bot.use_redis:
         # TODO: If you're using Redis, move the imports to the top of the file!
         from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
+
         return RedisStorage.from_url(
             config.redis.dsn(),
             key_builder=DefaultKeyBuilder(with_bot_id=True, with_destiny=True),
@@ -61,19 +62,18 @@ def get_storage(config: Config):
         return MemoryStorage()
 
 
-def exit_gracefully():
-    """Gracefully cancel all tasks and stop the event loop."""
+async def cancel_pending_tasks():
+    """Cancel all pending tasks except the current one."""
     try:
-        loop = asyncio.get_event_loop()
-        logger.debug("Cancelling tasks...")
         tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        (task.cancel() for task in tasks)
-        asyncio.gather(*tasks, return_exceptions=True)
-        loop.close()
-    except (SystemExit, KeyboardInterrupt):
-        pass
-    finally:
-        sys.exit(0)
+        if tasks:
+            logger.debug(f'Cancelling {len(tasks)} pending tasks...')
+            for task in tasks:
+                task.cancel()
+            # Wait for all tasks to be cancelled, ignoring exceptions
+            await asyncio.gather(*tasks, return_exceptions=True)
+    except Exception as e:
+        logger.warning(f'Error while cancelling tasks: {e}')
 
 
 async def on_startup():
@@ -90,28 +90,46 @@ async def on_startup():
 
 async def on_shutdown():
     """Insert code here to run it before shutdown"""
-    logging.warning("Shutting down...")
+    logging.warning('Shutting down...')
 
-    await notify_admins.on_shutdown(bot, config.tg_bot.admin_ids)
-    
-    # Remove webhook and close bot instance (not acceptable in some cases)
-    # await bot.delete_webhook()
-    # await bot.close()
+    try:
+        await notify_admins.on_shutdown(bot, config.tg_bot.admin_ids)
+    except Exception as e:
+        logger.warning(f'Error notifying admins on shutdown: {e}')
 
-    # Close DB connection (if used)
-    await bot.session.close()
-    await dp.storage.close()
+    # Close API client session first (it has its own aiohttp session)
+    try:
+        if bp_api:
+            await bp_api.close()
+    except Exception as e:
+        logger.warning(f'Error closing API client: {e}')
 
-    exit_gracefully()
-    logging.warning("Bye!")
+    # Close bot session (aiohttp session)
+    try:
+        if bot.session:
+            await bot.session.close()
+    except Exception as e:
+        logger.warning(f'Error closing bot session: {e}')
+
+    # Close storage
+    try:
+        if dp.storage:
+            await dp.storage.close()
+    except Exception as e:
+        logger.warning(f'Error closing storage: {e}')
+
+    # Cancel any remaining pending tasks
+    await cancel_pending_tasks()
+
+    logging.warning('Bye!')
 
 
-config = load_config("tgbot_bp/.env")
+config = load_config('tgbot_bp/.env')
 log_level = config.tg_bot.console_log_level
 
 setup_logging(log_level)
 logger = logging.getLogger(__name__)
-logger.debug(f"Bot config: {config}")
+logger.debug(f'Bot config: {config}')
 
 # Proxy URL with credentials: "protocol://user:password@host:port"
 session = AiohttpSession(config.tg_bot.proxy_url) if config.tg_bot.proxy_url else None
@@ -124,7 +142,7 @@ bp_api = BloodPressureApi(
     api_token=config.django_api.api_token,
     proxy=config.tg_bot.proxy_url,
 )
-dp["bp_api"] = bp_api
+dp['bp_api'] = bp_api
 
 dp.include_router(error_router)
 dp.include_routers(*routers_list)
