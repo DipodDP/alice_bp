@@ -14,9 +14,13 @@ dependencies = [
     "django-filter>=24.2",
 ]
 
+[tool.setuptools]
+packages = ["alice_skill", "config", "pyanywhere_bg", "tgbot_bp"]
+
 [dependency-groups]
 dev = [
     "pytest-django>=4.11.1",
+    "pytest-aiohttp>=1.0.0",
 ]
 
 [tool.uv.workspace]

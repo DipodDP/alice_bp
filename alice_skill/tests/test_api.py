@@ -2,6 +2,28 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from alice_skill.models import AliceUser, BloodPressureMeasurement
+from django.urls import reverse
+from unittest.mock import patch
+
+@pytest.mark.django_db
+class TestHealthCheck:
+    def test_health_check_healthy(self):
+        client = APIClient()
+        url = reverse('health-check')
+        response = client.get(url)
+        assert response.status_code == 200
+        assert response.data == {'status': 'healthy', 'database': 'connected'}
+
+    @patch('django.db.connection.ensure_connection')
+    def test_health_check_unhealthy(self, mock_ensure_connection):
+        mock_ensure_connection.side_effect = Exception("DB is down")
+        client = APIClient()
+        url = reverse('health-check')
+        response = client.get(url)
+        assert response.status_code == 503
+        assert response.data['status'] == 'unhealthy'
+        assert response.data['database'] == 'disconnected'
+
 
 @pytest.mark.django_db
 class TestBloodPressureMeasurementAPI:
