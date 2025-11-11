@@ -1,8 +1,49 @@
+import logging
 import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from .messages import DateFormattingMessages
+from .models import AliceUser
+
+logger = logging.getLogger(__name__)
+
+
+def get_user_context(request):
+    """
+    Adds user and timezone information to the serializer context.
+    """
+    context = {}
+    user = request.user
+    is_bot_request = getattr(request, 'is_bot', False)
+
+    # For authenticated users, add their AliceUser and timezone to the context
+    if user.is_authenticated:
+        try:
+            alice_user = AliceUser.objects.select_related('user').get(user=user)
+            context['alice_user'] = alice_user
+            context['timezone'] = alice_user.timezone or 'UTC'
+        except AliceUser.DoesNotExist:
+            pass  # No linked AliceUser, so no user-specific context is added
+
+    # For bot requests, find the user by user_id and add their info to the context
+    elif is_bot_request:
+        user_id = request.query_params.get('user_id')
+        if user_id:
+            try:
+                alice_user = AliceUser.objects.get(alice_user_id=user_id)
+                context['alice_user'] = alice_user
+                context['timezone'] = alice_user.timezone or 'UTC'
+                logger.debug(
+                    f"Bot request: Found user {user_id} with timezone '{alice_user.timezone}'"
+                )
+            except AliceUser.DoesNotExist:
+                logger.warning(
+                    f"Bot request: User with alice_user_id '{user_id}' not found"
+                )
+
+    return context
+
 
 
 def replace_latin_homoglyphs(text: str) -> str:

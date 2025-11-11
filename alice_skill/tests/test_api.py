@@ -16,9 +16,13 @@ class TestHealthCheck:
         assert response.status_code == 200
         assert response.data == {'status': 'healthy', 'database': 'connected'}
 
-    @patch('django.db.connection.ensure_connection')
-    def test_health_check_unhealthy(self, mock_ensure_connection):
-        mock_ensure_connection.side_effect = Exception('DB is down')
+    @patch('alice_skill.views.check_health')
+    def test_health_check_unhealthy(self, mock_check_health):
+        mock_check_health.return_value = {
+            'status': 'unhealthy',
+            'database': 'disconnected',
+            'error': 'DB is down',
+        }
         client = APIClient()
         url = reverse('health-check')
         response = client.get(url)

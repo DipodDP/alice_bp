@@ -15,12 +15,48 @@ class AliceUser(models.Model):
         return f"AliceUser(user={self.user}, alice_id={self.alice_user_id}, tg_id={self.telegram_user_id})"
 
 
+class BloodPressureMeasurementQuerySet(models.QuerySet):
+    def for_user(self, request):
+        """
+        Filters the queryset based on the user type and query parameters from the request.
+        """
+        user = request.user
+        is_bot_request = getattr(request, 'is_bot', False)
+
+        # Case 1: Request is from the bot
+        if is_bot_request:
+            user_id = request.query_params.get('user_id')
+            if user_id:
+                return self.filter(user__alice_user_id=user_id)
+            return self.none()
+
+        # Case 2: User is a superuser
+        if user.is_superuser:
+            user_id = request.query_params.get('user_id')
+            if user_id:
+                return self.filter(user__alice_user_id=user_id)
+            return self
+
+        # Case 3: Regular authenticated user
+        if user.is_authenticated:
+            try:
+                alice_user = AliceUser.objects.select_related('user').get(user=user)
+                return self.filter(user=alice_user)
+            except AliceUser.DoesNotExist:
+                return self.none()
+
+        # Case 4: Unauthenticated user (and not a bot)
+        return self.none()
+
+
 class BloodPressureMeasurement(models.Model):
     user = models.ForeignKey(AliceUser, on_delete=models.CASCADE, related_name='measurements')
     systolic = models.IntegerField()
     diastolic = models.IntegerField()
     pulse = models.IntegerField(null=True, blank=True)
     measured_at = models.DateTimeField(default=timezone.now)
+
+    objects = BloodPressureMeasurementQuerySet.as_manager()
 
     class Meta:
         ordering = ['-measured_at']

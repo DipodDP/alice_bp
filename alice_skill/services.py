@@ -9,6 +9,7 @@ from .wordlist import WORDLIST
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
+from django.db import connection, OperationalError
 
 logger = logging.getLogger(__name__)
 
@@ -150,3 +151,49 @@ def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
 
     return account_link_token.telegram_user_id
 
+
+def get_alice_user(alice_user_id: str = None, telegram_user_id: str = None) -> AliceUser | None:
+    """
+    Retrieves an AliceUser by either alice_user_id or telegram_user_id.
+    """
+    if not alice_user_id and not telegram_user_id:
+        return None
+
+    user = None
+    if alice_user_id:
+        user = AliceUser.objects.filter(alice_user_id=alice_user_id).first()
+    elif telegram_user_id:
+        user = AliceUser.objects.filter(telegram_user_id=telegram_user_id).first()
+
+    return user
+
+
+def process_alice_request(handlers: list, validated_request: dict) -> str | None:
+    """
+    Iterates through handlers to process an Alice request and returns a response text.
+    """
+    response_text = None
+    for handler in handlers:
+        try:
+            response_text = handler.handle(validated_request)
+        except Exception as e:
+            logger.exception(
+                f'Handler raised an exception:\n {e};\n...continuing to next handler'
+            )
+            continue
+        if response_text:
+            break
+    return response_text
+
+
+def check_health():
+    """
+    Checks the health of the service, including database connectivity.
+    Returns a dictionary with the status.
+    """
+    try:
+        connection.ensure_connection()
+        return {'status': 'healthy', 'database': 'connected'}
+    except OperationalError as e:
+        logger.error(f'Health check failed: {e}')
+        return {'status': 'unhealthy', 'database': 'disconnected', 'error': str(e)}

@@ -263,3 +263,53 @@ class MeasurementsApiTimezoneTests(APITestCase):
         self.assertEqual(
             len(response.data["results"]), 16
         )  # Should return all 16 measurements
+
+
+class MeasurementsApiFilteringTests(APITestCase):
+    def setUp(self):
+        self.list_url = reverse("measurement-list")
+        self.django_user = DjangoUser.objects.create_user(
+            username="test_user_filtering", password="testpassword"
+        )
+        self.user = AliceUser.objects.create(
+            user=self.django_user, alice_user_id="test_user_filtering"
+        )
+        self.client.login(username="test_user_filtering", password="testpassword")
+
+        # Create some measurements with different dates
+        now = timezone.now()
+        TestDataFactory.create_measurement(user=self.user, systolic=120, diastolic=80, measured_at=now - timedelta(days=5))
+        TestDataFactory.create_measurement(user=self.user, systolic=121, diastolic=81, measured_at=now - timedelta(days=3))
+        TestDataFactory.create_measurement(user=self.user, systolic=122, diastolic=82, measured_at=now - timedelta(days=1))
+
+    def test_filter_by_created_at_gte(self):
+        # Filter for measurements from 4 days ago until now
+        four_days_ago = (timezone.now() - timedelta(days=4)).strftime('%Y-%m-%d')
+        response = self.client.get(self.list_url, {"created_at__gte": four_days_ago})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 2)
+        # Check that the oldest measurement is not included
+        for result in response.data["results"]:
+            self.assertNotEqual(result["systolic"], 120)
+
+    def test_filter_by_created_at_lte(self):
+        # Filter for measurements up to 2 days ago
+        two_days_ago = (timezone.now() - timedelta(days=2)).strftime('%Y-%m-%d')
+        response = self.client.get(self.list_url, {"created_at__lte": two_days_ago})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 2)
+        # Check that the newest measurement is not included
+        for result in response.data["results"]:
+            self.assertNotEqual(result["systolic"], 122)
+
+    def test_filter_by_created_at_range(self):
+        # Filter for measurements between 4 and 2 days ago
+        four_days_ago = (timezone.now() - timedelta(days=4)).strftime('%Y-%m-%d')
+        two_days_ago = (timezone.now() - timedelta(days=2)).strftime('%Y-%m-%d')
+        response = self.client.get(self.list_url, {"created_at__gte": four_days_ago, "created_at__lte": two_days_ago})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["systolic"], 121)

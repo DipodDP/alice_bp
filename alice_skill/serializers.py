@@ -13,6 +13,10 @@ class AliceUserSerializer(serializers.ModelSerializer):
         fields = ["id", "alice_user_id", "telegram_user_id"]
 
 
+class GenerateLinkTokenRequestSerializer(serializers.Serializer):
+    telegram_user_id = serializers.IntegerField()
+
+
 class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=AliceUser.objects.all())
     measured_at = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%S%z", required=False, allow_null=True)
