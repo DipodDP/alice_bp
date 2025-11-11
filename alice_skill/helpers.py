@@ -2,11 +2,26 @@ import logging
 import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import hmac
+import hashlib
 
+from django.conf import settings
 from .messages import DateFormattingMessages
 from .models import AliceUser
 
 logger = logging.getLogger(__name__)
+
+
+def get_hashed_telegram_id(telegram_id: str) -> str:
+    """
+    Hashes the given telegram_id using HMAC-SHA256 with a secret key from settings.
+    """
+    secret_key = settings.TELEGRAM_ID_HMAC_KEY
+    return hmac.new(
+        secret_key.encode("utf-8"),
+        str(telegram_id).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def get_user_context(request):

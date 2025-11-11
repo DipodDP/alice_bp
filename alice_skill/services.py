@@ -26,7 +26,7 @@ RATE_LIMIT_SECONDS = getattr(settings, "ALICE_LINK_RATE_LIMIT_SECONDS", 60)
 TOKEN_LIFETIME_MINUTES = getattr(settings, "ALICE_LINK_TOKEN_LIFETIME_MINUTES", 10)
 
 
-def generate_link_token(telegram_user_id: int) -> str:
+def generate_link_token(telegram_user_id: str) -> str:
     """
     Generates a unique plaintext token in the format "word-number", stores its hash in the database, and returns the plaintext token.
     The token consists of a random word from a predefined wordlist and a random 3-digit number.
@@ -106,7 +106,7 @@ def _generate_candidate_phrases(tokens: list[str]) -> list[str]:
     return list(set(phrases))
 
 
-def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
+def match_webhook_to_telegram_user(webhook_json: dict) -> str | None:
     """
     Matches incoming Alice webhook NLU tokens against stored AccountLinkTokens.
     Returns the telegram_user_id if a match is found, otherwise None.
@@ -142,11 +142,11 @@ def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
     account_link_token.used = True
     account_link_token.save()
 
-    telegram_user_id_str = str(account_link_token.telegram_user_id)
+    telegram_user_id = account_link_token.telegram_user_id
 
     user, _ = AliceUser.objects.get_or_create(alice_user_id=alice_user_id)
-    AliceUser.objects.filter(telegram_user_id=telegram_user_id_str).exclude(pk=user.pk).update(telegram_user_id=None)
-    user.telegram_user_id = telegram_user_id_str
+    AliceUser.objects.filter(telegram_user_id=telegram_user_id).exclude(pk=user.pk).update(telegram_user_id=None)
+    user.telegram_user_id = telegram_user_id
     user.save()
 
     return account_link_token.telegram_user_id

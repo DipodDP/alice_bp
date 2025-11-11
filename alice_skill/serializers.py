@@ -14,7 +14,10 @@ class AliceUserSerializer(serializers.ModelSerializer):
 
 
 class GenerateLinkTokenRequestSerializer(serializers.Serializer):
-    telegram_user_id = serializers.IntegerField()
+    # This field accepts the plaintext Telegram User ID as a string.
+    # No specific format validation is performed here, as the value is
+    # immediately hashed by the backend. Any string is acceptable.
+    telegram_user_id = serializers.CharField(max_length=64)
 
 
 class BloodPressureMeasurementSerializer(serializers.ModelSerializer):

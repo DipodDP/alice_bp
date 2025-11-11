@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from ..models import BloodPressureMeasurement
 
+
 class TestDataFactory:
     @staticmethod
     def create_measurement(user, systolic, diastolic, pulse=None, measured_at=None):
@@ -17,8 +18,8 @@ class TestDataFactory:
     @staticmethod
     def create_validated_request_data(original_utterance, user_id='u', timezone='UTC'):
         return {
-            "meta": {"timezone": timezone},
-            "request": {"original_utterance": original_utterance},
-            "session": {"user_id": user_id},
-            "version": "1.0",
+            'meta': {'timezone': timezone},
+            'request': {'original_utterance': original_utterance},
+            'session': {'user_id': user_id},
+            'version': '1.0',
         }

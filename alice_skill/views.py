@@ -16,7 +16,7 @@ from .messages import (
     LinkStatusViewMessages,
     ViewMessages,
 )
-from .helpers import build_alice_response_payload, get_user_context
+from .helpers import build_alice_response_payload, get_user_context, get_hashed_telegram_id
 from .models import BloodPressureMeasurement, AliceUser
 from .permissions import IsBot, IsAliceWebhook
 from .services import (
@@ -136,6 +136,8 @@ class UserAwareAPIView(APIView):
     def get_user_from_request(self, request):
         alice_user_id = request.data.get('session', {}).get('user_id')
         telegram_user_id = request.data.get('telegram_user_id')
+        if telegram_user_id:
+            telegram_user_id = get_hashed_telegram_id(telegram_user_id)
         return get_alice_user(
             alice_user_id=alice_user_id, telegram_user_id=telegram_user_id
         )
@@ -233,7 +235,8 @@ class UserByTelegramView(APIView):
 
     def get(self, request, telegram_id, *args, **kwargs):
         try:
-            user = AliceUser.objects.get(telegram_user_id=telegram_id)
+            hashed_telegram_id = get_hashed_telegram_id(telegram_id)
+            user = AliceUser.objects.get(telegram_user_id=hashed_telegram_id)
             serializer = AliceUserSerializer(user)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except AliceUser.DoesNotExist:
@@ -262,9 +265,10 @@ class GenerateLinkTokenView(APIView):
             )
 
         telegram_user_id = serializer.validated_data['telegram_user_id']
+        hashed_telegram_id = get_hashed_telegram_id(telegram_user_id)
 
         try:
-            plaintext_token = generate_link_token(telegram_user_id=telegram_user_id)
+            plaintext_token = generate_link_token(telegram_user_id=hashed_telegram_id)
             return Response(
                 {
                     'status': 'success',

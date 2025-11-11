@@ -14,6 +14,7 @@ This project allows users to link their Yandex.Alice account with their Telegram
 *   **Unlinking:** Unlink your accounts from either Alice or Telegram.
 *   **Rate Limiting:** To prevent abuse, token generation is rate-limited.
 *   **Audit Logging:** All linking attempts are logged for security purposes.
+*   **Secure Telegram ID Handling:** Telegram user IDs are hashed using HMAC-SHA256 before storage to protect user privacy.
 
 ## How to Use
 
@@ -64,9 +65,22 @@ The Telegram bot consumes the following endpoints from the Alice Skill API:
 
 For full details on these endpoints, refer to the "Alice Skill Endpoints" section.
 
-## Webhook Security
+## Security
+
+### Webhook Security
 
 To secure the webhooks and ensure that requests are only coming from Yandex and Telegram, the application uses secret tokens. You must configure these for the application to work correctly with webhooks.
+
+### Telegram ID Hashing
+
+For privacy and security, Telegram user IDs are hashed using HMAC-SHA256 before being stored in the database. The hashing is performed at the API boundary, ensuring that plaintext Telegram IDs never enter the database.
+
+**Required Environment Variables:**
+
+*   **`TELEGRAM_ID_HMAC_KEY`**: A secret key used for HMAC-SHA256 hashing of Telegram user IDs. This must be a secure, random string. Generate it using one of the methods described in the "Token Generation Examples" section below.
+*   **`LINK_SECRET`**: A secret key used for hashing account linking tokens. This must be a secure, random string. Generate it using one of the methods described in the "Token Generation Examples" section below.
+
+**Important:** Both `TELEGRAM_ID_HMAC_KEY` and `LINK_SECRET` are required and must be set in your environment. The application will fail to start if these are not configured.
 
 #### Token Generation Examples
 
@@ -185,6 +199,36 @@ Example:
 uv run manage.py update_user_timezone --alice-user-id "some_long_id" --timezone "Europe/Moscow"
 ```
 
+### `migrate_telegram_ids`
+
+Migrates existing plaintext Telegram user IDs to HMAC-SHA256 hashed values. This command is useful when upgrading from a version that stored plaintext IDs to the current version that uses hashed IDs.
+
+**Usage:**
+
+```bash
+uv run manage.py migrate_telegram_ids
+```
+
+**Options:**
+
+*   `--dry-run`: Simulates the migration without making any changes to the database. Use this to preview what would be migrated.
+
+**Examples:**
+
+Preview the migration without making changes:
+
+```bash
+uv run manage.py migrate_telegram_ids --dry-run
+```
+
+Perform the actual migration:
+
+```bash
+uv run manage.py migrate_telegram_ids
+```
+
+**Note:** The command automatically skips Telegram IDs that are already hashed (64-character hex strings). It only migrates plaintext IDs that need to be hashed.
+
 ## Getting Started
 
 ### Prerequisites
@@ -205,7 +249,12 @@ uv run manage.py update_user_timezone --alice-user-id "some_long_id" --timezone 
 
     ```
 
-2.  Set up your environment variables. Copy the `.env.dist` file to `.env` and fill in the required values, including the secret tokens as described in the "Webhook Security" section.
+2.  Set up your environment variables. Copy the `.env.dist` file to `.env` and fill in the required values, including the secret tokens as described in the "Security" section. You must set the following required environment variables:
+
+    *   `TELEGRAM_ID_HMAC_KEY`: Secret key for hashing Telegram user IDs
+    *   `LINK_SECRET`: Secret key for hashing account linking tokens
+    *   `ALICE_WEBHOOK_SECRET`: Secret token for Alice webhook authentication (optional for local development)
+    *   `BOT_WEBHOOK_SECRET`: Secret token for Telegram bot webhook authentication (optional for local development)
 
     ```bash
 
@@ -229,7 +278,16 @@ uv run manage.py update_user_timezone --alice-user-id "some_long_id" --timezone 
 
     ```
 
-5.  Run the development server:
+5.  (Optional) If you have existing data with plaintext Telegram user IDs, migrate them to hashed values:
+
+    ```bash
+
+    uv run manage.py migrate_telegram_ids --dry-run  # Preview changes first
+    uv run manage.py migrate_telegram_ids             # Perform the migration
+
+    ```
+
+6.  Run the development server:
 
     ```bash
 

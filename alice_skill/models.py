@@ -71,7 +71,7 @@ class BloodPressureMeasurement(models.Model):
 
 class AccountLinkToken(models.Model):
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
-    telegram_user_id = models.BigIntegerField(db_index=True)
+    telegram_user_id = models.CharField(max_length=64, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     used = models.BooleanField(default=False)

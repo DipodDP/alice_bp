@@ -23,7 +23,7 @@ class RecordPressureHandlerTest(TestCase):
     def test_handle_success(self):
         self.assertEqual(BloodPressureMeasurement.objects.count(), 0)
         validated_request_data = self.factory.create_validated_request_data(
-            original_utterance="запомни давление 120 на 80"
+            original_utterance='запомни давление 120 на 80'
         )
         response_text = self.handler.handle(validated_request_data)
         self.assertEqual(BloodPressureMeasurement.objects.count(), 1)
@@ -38,7 +38,7 @@ class RecordPressureHandlerTest(TestCase):
     def test_handle_parse_error(self):
         self.assertEqual(BloodPressureMeasurement.objects.count(), 0)
         validated_request_data = self.factory.create_validated_request_data(
-            original_utterance="какая-то ерунда", user_id=None
+            original_utterance='какая-то ерунда', user_id=None
         )
         response_text = self.handler.handle(validated_request_data)
         self.assertEqual(
@@ -53,7 +53,7 @@ class LastMeasurementHandlerTest(TestCase):
         self.factory = TestDataFactory()
         self.user = AliceUser.objects.create(alice_user_id='u')
 
-    @mock.patch("django.utils.timezone.now")
+    @mock.patch('django.utils.timezone.now')
     def test_handle_with_measurements(self, mock_now):
         """Test handler returns last measurement when measurements exist."""
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
@@ -75,7 +75,7 @@ class LastMeasurementHandlerTest(TestCase):
         )
 
         validated_request_data = self.factory.create_validated_request_data(
-            original_utterance="покажи последнее давление"
+            original_utterance='покажи последнее давление'
         )
 
         response_text = self.handler.handle(validated_request_data)
@@ -83,10 +83,10 @@ class LastMeasurementHandlerTest(TestCase):
         # Should return the most recent measurement (measurement2)
         expected_text = LastMeasurementMessages.REPLY.format(systolic=130, diastolic=85)
         expected_text += LastMeasurementMessages.PULSE.format(pulse=75)
-        expected_text += f"({DateFormattingMessages.TODAY} {DateFormattingMessages.PREPOSITION} 12:00)"
+        expected_text += f'({DateFormattingMessages.TODAY} {DateFormattingMessages.PREPOSITION} 12:00)'
         self.assertEqual(response_text, expected_text)
 
-    @mock.patch("django.utils.timezone.now")
+    @mock.patch('django.utils.timezone.now')
     def test_handle_without_pulse(self, mock_now):
         """Test handler works when measurement has no pulse."""
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
@@ -100,84 +100,93 @@ class LastMeasurementHandlerTest(TestCase):
         )
 
         validated_request_data = self.factory.create_validated_request_data(
-            original_utterance="последнее давление"
+            original_utterance='последнее давление'
         )
 
         response_text = self.handler.handle(validated_request_data)
 
         expected_text = LastMeasurementMessages.REPLY.format(systolic=110, diastolic=70)
-        expected_text += f"({DateFormattingMessages.TODAY} {DateFormattingMessages.PREPOSITION} 12:00)"
+        expected_text += f'({DateFormattingMessages.TODAY} {DateFormattingMessages.PREPOSITION} 12:00)'
         self.assertEqual(response_text, expected_text)
 
-    @mock.patch("django.utils.timezone.now")
+    @mock.patch('django.utils.timezone.now')
     def test_handle_no_measurements(self, mock_now):
         """Test handler returns appropriate message when no measurements exist."""
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
         mock_now.return_value = fixed_now
         validated_request_data = self.factory.create_validated_request_data(
-            original_utterance="покажи давление"
+            original_utterance='покажи давление'
         )
 
         response_text = self.handler.handle(validated_request_data)
 
         self.assertEqual(response_text, LastMeasurementMessages.NO_RECORDS)
 
-    @mock.patch("django.utils.timezone.now")
+    @mock.patch('django.utils.timezone.now')
     def test_handle_no_keywords(self, mock_now):
         """Test handler returns None when no keywords match."""
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
         mock_now.return_value = fixed_now
         self.factory.create_measurement(
-            user=self.user, systolic=120, diastolic=80, measured_at=mock_now.return_value
+            user=self.user,
+            systolic=120,
+            diastolic=80,
+            measured_at=mock_now.return_value,
         )
 
         validated_request_data = self.factory.create_validated_request_data(
-            original_utterance="какая-то ерунда"
+            original_utterance='какая-то ерунда'
         )
 
         response_text = self.handler.handle(validated_request_data)
 
         self.assertIsNone(response_text)
 
-    @mock.patch("django.utils.timezone.now")
+    @mock.patch('django.utils.timezone.now')
     def test_handle_partial_keyword_match(self, mock_now):
         """Test handler works with partial keyword matches."""
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
         mock_now.return_value = fixed_now
         self.factory.create_measurement(
-            user=self.user, systolic=125, diastolic=82, measured_at=mock_now.return_value
+            user=self.user,
+            systolic=125,
+            diastolic=82,
+            measured_at=mock_now.return_value,
         )
 
         validated_request_data = self.factory.create_validated_request_data(
-            original_utterance="последнее"
+            original_utterance='последнее'
         )
 
         response_text = self.handler.handle(validated_request_data)
 
         expected_text = LastMeasurementMessages.REPLY.format(systolic=125, diastolic=82)
-        expected_text += f"({DateFormattingMessages.TODAY} {DateFormattingMessages.PREPOSITION} 12:00)"
+        expected_text += f'({DateFormattingMessages.TODAY} {DateFormattingMessages.PREPOSITION} 12:00)'
         self.assertEqual(response_text, expected_text)
 
-    @mock.patch("django.utils.timezone.now")
+    @mock.patch('django.utils.timezone.now')
     def test_handle_case_insensitive(self, mock_now):
         """Test handler works with different cases."""
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
         mock_now.return_value = fixed_now
         self.factory.create_measurement(
-            user=self.user, systolic=115, diastolic=75, measured_at=mock_now.return_value
+            user=self.user,
+            systolic=115,
+            diastolic=75,
+            measured_at=mock_now.return_value,
         )
 
         validated_request_data = self.factory.create_validated_request_data(
-            original_utterance="ПОКАЖИ ДАВЛЕНИЕ"
+            original_utterance='ПОКАЖИ ДАВЛЕНИЕ'
         )
 
         response_text = self.handler.handle(validated_request_data)
 
         expected_text = LastMeasurementMessages.REPLY.format(systolic=115, diastolic=75)
-        expected_text += f"({DateFormattingMessages.TODAY} {DateFormattingMessages.PREPOSITION} 12:00)"
+        expected_text += f'({DateFormattingMessages.TODAY} {DateFormattingMessages.PREPOSITION} 12:00)'
         self.assertEqual(response_text, expected_text)
 
-    @mock.patch("django.utils.timezone.now")
+    @mock.patch('django.utils.timezone.now')
     def test_handle_date_formats(self, mock_now):
         """Test handler returns correct date formats for different measurement dates."""
         fixed_now = datetime(2025, 10, 24, 12, 0, 0, tzinfo=dt_timezone.utc)
@@ -186,17 +195,17 @@ class LastMeasurementHandlerTest(TestCase):
         test_cases = [
             (
                 timedelta(days=1),
-                f"{DateFormattingMessages.YESTERDAY} {DateFormattingMessages.PREPOSITION} 12:00",
+                f'{DateFormattingMessages.YESTERDAY} {DateFormattingMessages.PREPOSITION} 12:00',
             ),
             (
                 timedelta(days=2),
-                f"{DateFormattingMessages.DAY_BEFORE_YESTERDAY} {DateFormattingMessages.PREPOSITION} 12:00",
+                f'{DateFormattingMessages.DAY_BEFORE_YESTERDAY} {DateFormattingMessages.PREPOSITION} 12:00',
             ),
             (
                 timedelta(days=3),
                 (mock_now.return_value - timedelta(days=3))
                 .astimezone(dt_timezone.utc)
-                .strftime("%d.%m.%Y"),
+                .strftime('%d.%m.%Y'),
             ),
         ]
 
@@ -211,7 +220,7 @@ class LastMeasurementHandlerTest(TestCase):
                     measured_at=measurement_time,
                 )
                 validated_request_data = self.factory.create_validated_request_data(
-                    original_utterance="покажи последнее давление"
+                    original_utterance='покажи последнее давление'
                 )
                 response_text = self.handler.handle(validated_request_data)
                 self.assertIn(expected_date_str, response_text)
