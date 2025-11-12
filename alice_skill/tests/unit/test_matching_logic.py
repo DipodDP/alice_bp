@@ -2,9 +2,9 @@ from django.test import TestCase, override_settings
 from datetime import timedelta
 from unittest.mock import patch
 
-from ..helpers import get_hashed_telegram_id
-from ..models import AccountLinkToken
-from ..services import (
+from ...helpers import get_hashed_telegram_id
+from ...models import AccountLinkToken
+from ...services import (
     generate_link_token,
     match_webhook_to_telegram_user,
     TokenAlreadyUsed,

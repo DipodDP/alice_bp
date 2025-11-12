@@ -8,7 +8,7 @@ SECRET_KEY = os.environ.get(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "True") == "True"
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv(key="ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
 
@@ -20,6 +20,9 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
 ALICE_WEBHOOK_SECRET = os.environ.get("ALICE_WEBHOOK_SECRET")
 TELEGRAM_ID_HMAC_KEY = os.environ.get("TELEGRAM_ID_HMAC_KEY")
 LINK_SECRET = os.environ.get("LINK_SECRET")
+
+if not ALICE_WEBHOOK_SECRET:
+    raise ImproperlyConfigured("ALICE_WEBHOOK_SECRET must be set in the environment.")
 
 if not TELEGRAM_ID_HMAC_KEY:
     raise ImproperlyConfigured("TELEGRAM_ID_HMAC_KEY must be set in the environment.")

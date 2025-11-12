@@ -3,12 +3,12 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from django.urls import reverse
 
-from ..messages import (
+from ...messages import (
     HandlerMessages,
     LastMeasurementMessages,
     RecordPressureMessages,
 )
-from ..models import BloodPressureMeasurement, AliceUser
+from ...models import BloodPressureMeasurement, AliceUser
 
 
 @override_settings(ALICE_WEBHOOK_SECRET='test-secret')

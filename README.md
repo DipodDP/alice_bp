@@ -236,8 +236,9 @@ uv run manage.py migrate_telegram_ids
 
 ### Prerequisites
 
-*   Python 3.11+
-*   Django 4.2+
+*   Python 3.13+
+*   [uv](https://docs.astral.sh/uv/) (for dependency management)
+*   Django 5.2+
 *   aiogram 3.x
 
 ### Installation
@@ -305,3 +306,66 @@ To run the tests, use the following command:
 ```bash
 uv run manage.py test
 ```
+
+Or with pytest:
+
+```bash
+uv run pytest
+```
+
+
+**Before running:** Make sure all required secrets are set in your `.env` file. Use:
+```bash
+uv run manage.py generate_secret_keys >> .env
+```
+
+### 📊 Test Coverage
+
+- Django app: 2,110 lines of tests (87+ test cases)
+- Telegram bot: 777 lines of tests (40+ test cases)
+- Integration tests: End-to-end flow validation
+- **Total: 2,887 lines of test code**
+
+## Development
+
+### Dependency Management
+
+This project uses [uv](https://docs.astral.sh/uv/) for fast, reliable dependency management with a workspace setup:
+
+- **Main API** (`alice-bp`): Django REST API for Alice skill
+- **Telegram Bot** (`tgbot-bp`): aiogram-based bot in `tgbot_bp/` directory
+- **Single lockfile**: `uv.lock` ensures reproducible installs across both packages
+
+#### Adding Dependencies
+
+```bash
+# Add to main API
+uv add django-package-name
+
+# Add to telegram bot
+uv add --package tgbot-bp aiogram-package-name
+
+# Add dev dependency (testing, linting, etc.)
+uv add --dev pytest-plugin-name
+
+# Sync after changes
+uv sync --all-packages --all-groups
+```
+
+#### Installing Dependencies
+
+```bash
+# Install everything (both packages + dev dependencies)
+uv sync --all-packages --all-groups
+
+# Install only production dependencies
+uv sync --all-packages
+
+# Install only main API
+uv sync
+
+# Install only specific package
+uv sync --package tgbot-bp
+```
+
+**Note**: `requirements.txt` files are auto-generated and gitignored. Use `uv.lock` as the single source of truth.

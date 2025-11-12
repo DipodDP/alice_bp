@@ -3,15 +3,15 @@ from datetime import timedelta, datetime
 from datetime import timezone as dt_timezone
 from unittest import mock
 
-from ..messages import (
+from ...messages import (
     DateFormattingMessages,
     LastMeasurementMessages,
     RecordPressureMessages,
 )
 
-from ..models import BloodPressureMeasurement, AliceUser
-from ..handlers.record_pressure import RecordPressureHandler
-from ..handlers.last_measurement import LastMeasurementHandler
+from ...models import BloodPressureMeasurement, AliceUser
+from ...handlers.record_pressure import RecordPressureHandler
+from ...handlers.last_measurement import LastMeasurementHandler
 from .factories import TestDataFactory
 
 

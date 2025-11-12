@@ -4,12 +4,12 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from unittest.mock import patch
 
-from ..messages import LinkAccountMessages
+from ...messages import LinkAccountMessages
 
 
-from ..models import AliceUser, AccountLinkToken
-from ..services import generate_link_token
-from ..helpers import get_hashed_telegram_id
+from ...models import AliceUser, AccountLinkToken
+from ...services import generate_link_token
+from ...helpers import get_hashed_telegram_id
 
 
 @override_settings(ALICE_WEBHOOK_SECRET='test-secret')

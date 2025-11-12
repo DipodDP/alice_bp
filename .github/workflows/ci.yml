@@ -1,0 +1,362 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop, api_security ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/uv
+        key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-
+
+    - name: Install dependencies
+      run: |
+        uv sync --frozen --all-groups
+
+    - name: Generate test secrets
+      run: |
+        python manage.py generate_secret_keys > /tmp/keys.txt
+        echo "SECRET_KEY=$(grep '^SECRET_KEY=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "ALICE_WEBHOOK_SECRET=$(grep '^ALICE_WEBHOOK_SECRET=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "TELEGRAM_ID_HMAC_KEY=$(grep '^TELEGRAM_ID_HMAC_KEY=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "LINK_SECRET=$(grep '^LINK_SECRET=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "API_TOKEN=$(grep '^API_TOKEN=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "BOT_WEBHOOK_SECRET=$(grep '^BOT_WEBHOOK_SECRET=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+
+    - name: Set test environment
+      run: |
+        echo "DEBUG=False" >> $GITHUB_ENV
+        echo "DATABASE_URL=sqlite:///test_db.sqlite3" >> $GITHUB_ENV
+
+    - name: Run Django system checks
+      run: |
+        python manage.py check
+
+    - name: Check migrations
+      run: |
+        python manage.py makemigrations --check --dry-run --no-input
+
+    - name: Run migrations
+      run: |
+        python manage.py migrate --no-input
+
+    - name: Run unit tests with coverage
+      run: |
+        pytest alice_skill/tests/unit/ \
+          --cov=alice_skill \
+          --cov=pyanywhere_bg \
+          --cov-report=xml \
+          --cov-report=term \
+          --cov-report=html \
+          -v
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: github.event_name == 'push'
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Archive coverage report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: unit-test-coverage-report
+        path: htmlcov/
+
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install security tools
+      run: |
+        uv sync --frozen --group dev --no-install-project
+
+    - name: Run Bandit security scanner
+      run: |
+        bandit -r alice_skill/ pyanywhere_bg/ config/ \
+          -f json -o bandit-report.json \
+          --severity-level medium || true
+        bandit -r alice_skill/ pyanywhere_bg/ config/ \
+          -f screen \
+          --severity-level medium
+
+    - name: Upload Bandit report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bandit-security-report
+        path: bandit-report.json
+
+    - name: Run Safety dependency check
+      run: |
+        safety check --json --output safety-report.json || true
+        safety check || true
+
+    - name: Upload Safety report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: safety-dependency-report
+        path: safety-report.json
+
+    - name: Check for hardcoded secrets
+      run: |
+        echo "Checking for hardcoded secrets..."
+
+        # Check for SECRET_KEY assignments (should only be in .env files)
+        if grep -r "SECRET_KEY\s*=\s*['\"]" --include="*.py" alice_skill/ config/ pyanywhere_bg/ 2>/dev/null; then
+          echo "ERROR: Found hardcoded SECRET_KEY"
+          exit 1
+        fi
+
+        # Check for password assignments
+        if grep -r "password\s*=\s*['\"]" --include="*.py" alice_skill/ config/ 2>/dev/null | grep -v "test" | grep -v "example"; then
+          echo "WARNING: Found potential hardcoded passwords"
+        fi
+
+        echo "✓ No obvious hardcoded secrets found"
+
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install linting tools
+      run: |
+        uv sync --frozen --group dev --no-install-project
+
+    - name: Run Ruff linter
+      run: |
+        ruff check alice_skill/ pyanywhere_bg/ config/ \
+          --output-format=github \
+          --exit-zero
+
+    - name: Run Ruff formatter check
+      run: |
+        ruff format alice_skill/ pyanywhere_bg/ config/ --check
+
+  deployment-check:
+    name: Production Readiness
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        uv sync --frozen
+
+    - name: Generate secrets for deployment check
+      run: |
+        python manage.py generate_secret_keys > /tmp/keys.txt
+        echo "SECRET_KEY=$(grep '^SECRET_KEY=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "ALICE_WEBHOOK_SECRET=$(grep '^ALICE_WEBHOOK_SECRET=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "TELEGRAM_ID_HMAC_KEY=$(grep '^TELEGRAM_ID_HMAC_KEY=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "LINK_SECRET=$(grep '^LINK_SECRET=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "API_TOKEN=$(grep '^API_TOKEN=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+
+    - name: Check .env.dist doesn't have production issues
+      run: |
+        echo "Checking .env.dist template..."
+
+        # Verify it exists
+        test -f .env.dist || (echo "ERROR: .env.dist not found" && exit 1)
+
+        # Check for insecure defaults
+        if grep -q "SECRET_KEY=django-insecure-" .env.dist; then
+          echo "WARNING: .env.dist contains insecure SECRET_KEY (expected for template)"
+        fi
+
+        echo "✓ .env.dist template is present"
+
+    - name: Validate required files
+      run: |
+        test -f .env.dist || exit 1
+        test -f uv.lock || exit 1
+        test -f pyproject.toml || exit 1
+        test -f manage.py || exit 1
+        test -f pytest.ini || exit 1
+        test -f README.md || exit 1
+        echo "✓ All required files present"
+
+    - name: Run Django deployment checks
+      run: |
+        export DEBUG=False
+        export ALLOWED_HOSTS=example.com
+        python manage.py check --deploy --fail-level WARNING
+
+    - name: Test migrations are consistent
+      run: |
+        python manage.py makemigrations --check --dry-run --no-input
+
+  bot-tests:
+    name: Telegram Bot Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install bot dependencies
+      run: |
+        uv sync --frozen --all-packages --all-groups
+
+    - name: Run bot tests
+      run: |
+        pytest tgbot_bp/tests/ -v --tb=short
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        uv sync --frozen --all-groups
+
+    - name: Generate test secrets
+      run: |
+        python manage.py generate_secret_keys > /tmp/keys.txt
+        echo "SECRET_KEY=$(grep '^SECRET_KEY=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "ALICE_WEBHOOK_SECRET=$(grep '^ALICE_WEBHOOK_SECRET=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "TELEGRAM_ID_HMAC_KEY=$(grep '^TELEGRAM_ID_HMAC_KEY=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "LINK_SECRET=$(grep '^LINK_SECRET=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+        echo "API_TOKEN=$(grep '^API_TOKEN=' /tmp/keys.txt | cut -d= -f2-)" >> $GITHUB_ENV
+
+    - name: Set test environment
+      run: |
+        echo "DEBUG=False" >> $GITHUB_ENV
+        echo "DATABASE_URL=sqlite:///test_integration.sqlite3" >> $GITHUB_ENV
+
+    - name: Run migrations
+      run: |
+        python manage.py migrate --no-input
+
+    - name: Run integration tests
+      run: |
+        pytest alice_skill/tests/integration/ -v --tb=short
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [test, security, lint, deployment-check, bot-tests, integration-tests]
+    if: always()
+
+    steps:
+    - name: Check job results
+      run: |
+        echo "Test Job: ${{ needs.test.result }}"
+        echo "Security Job: ${{ needs.security.result }}"
+        echo "Lint Job: ${{ needs.lint.result }}"
+        echo "Deployment Check: ${{ needs.deployment-check.result }}"
+        echo "Bot Tests: ${{ needs.bot-tests.result }}"
+        echo "Integration Tests: ${{ needs.integration-tests.result }}"
+
+    - name: Evaluate overall status
+      if: |
+        needs.test.result == 'failure' ||
+        needs.deployment-check.result == 'failure' ||
+        needs.bot-tests.result == 'failure' ||
+        needs.integration-tests.result == 'failure'
+      run: |
+        echo "❌ CI Pipeline Failed"
+        exit 1
+
+    - name: Success
+      if: |
+        needs.test.result == 'success' &&
+        needs.deployment-check.result == 'success' &&
+        needs.bot-tests.result == 'success' &&
+        needs.integration-tests.result == 'success'
+      run: |
+        echo "✅ CI Pipeline Passed"

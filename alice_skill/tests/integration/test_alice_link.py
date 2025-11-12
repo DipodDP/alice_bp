@@ -7,10 +7,10 @@ from datetime import timedelta
 import pytest
 from django.utils import timezone
 
-from ..messages import LinkAccountMessages, HandlerMessages
-from ..models import AccountLinkToken, AliceUser
-from ..wordlist import WORDLIST
-from ..helpers import get_hashed_telegram_id
+from ...messages import LinkAccountMessages, HandlerMessages
+from ...models import AccountLinkToken, AliceUser
+from ...wordlist import WORDLIST
+from ...helpers import get_hashed_telegram_id
 
 
 @pytest.fixture(autouse=True)

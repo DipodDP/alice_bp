@@ -1,5 +1,0 @@
-aiogram~=3.0
-environs~=9.0
-betterlogging
-aiogram-dialog~=2.2.0
-aiohttp~=3.9.0

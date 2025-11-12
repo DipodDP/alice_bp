@@ -1,6 +1,6 @@
 from django.test import TestCase
-from ..models import AliceUser
-from ..serializers import BloodPressureMeasurementSerializer
+from ...models import AliceUser
+from ...serializers import BloodPressureMeasurementSerializer
 
 
 class BloodPressureSerializerValidationTests(TestCase):
