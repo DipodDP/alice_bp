@@ -19,7 +19,7 @@ class AccountLinkTokenModelTest(TestCase):
         fields = [field.name for field in AccountLinkToken._meta.get_fields()]
         self.assertIn('id', fields)
         self.assertIn('token_hash', fields)
-        self.assertIn('telegram_user_id', fields)
+        self.assertIn('telegram_user_id_hash', fields)
         self.assertIn('created_at', fields)
         self.assertIn('expires_at', fields)
         self.assertIn('used', fields)
@@ -39,7 +39,7 @@ class AccountLinkTokenModelTest(TestCase):
         telegram_user_id = '12345'
         hashed_telegram_id = get_hashed_telegram_id(telegram_user_id)
 
-        plaintext_token = generate_link_token(hashed_telegram_id)
+        plaintext_token = generate_link_token(telegram_user_id)
 
         self.assertEqual(plaintext_token, 'мост-627')
 
@@ -48,27 +48,29 @@ class AccountLinkTokenModelTest(TestCase):
         stored_token = AccountLinkToken.objects.first()
 
         self.assertEqual(stored_token.token_hash, 'hashedtoken123')
-        self.assertEqual(stored_token.telegram_user_id, hashed_telegram_id)
+        self.assertEqual(stored_token.telegram_user_id_hash, hashed_telegram_id)
         self.assertFalse(stored_token.used)
         self.assertLess(timezone.now() - stored_token.created_at, timedelta(seconds=5))
         self.assertGreater(stored_token.expires_at, timezone.now())
 
     @patch('alice_skill.services.secrets.SystemRandom')
+    @patch('alice_skill.services.get_hashed_telegram_id')
     @patch('alice_skill.services.hmac.new')
-    def test_rate_limit_and_uniqueness(self, mock_hmac_new, mock_system_random):
+    def test_rate_limit_and_uniqueness(self, mock_hmac_new, mock_get_hashed_telegram_id, mock_system_random):
         """
         Tests that generating tokens too frequently for the same user raises TooManyRequests
         and that simultaneous requests yield distinct tokens.
         """
-        mock_hmac_new.return_value.hexdigest.side_effect = ['hash1', 'hash2', 'hash3']
+        mock_hmac_new.return_value.hexdigest.side_effect = ['hash1', 'hash2', 'hash3', 'hash4'] # Added more side effects
         mock_system_random.return_value.choice.side_effect = ['word1', 'word3', 'word5']
         mock_system_random.return_value.randint.side_effect = [123, 456, 789]
 
         telegram_user_id = '67890'
-        hashed_telegram_id = get_hashed_telegram_id(telegram_user_id)
+        hashed_telegram_id = 'hashed_67890' # Mock the hashed ID
+        mock_get_hashed_telegram_id.return_value = hashed_telegram_id
 
         # First token generation should succeed
-        token1 = generate_link_token(hashed_telegram_id)
+        token1 = generate_link_token(telegram_user_id)
         self.assertEqual(token1, 'word1-123')
         self.assertEqual(AccountLinkToken.objects.count(), 1)
 
@@ -79,4 +81,4 @@ class AccountLinkTokenModelTest(TestCase):
             ) + timedelta(seconds=5)
             # Second token generation for the same user should raise TooManyRequests
             with self.assertRaises(TooManyRequests):
-                generate_link_token(hashed_telegram_id)
+                generate_link_token(telegram_user_id)

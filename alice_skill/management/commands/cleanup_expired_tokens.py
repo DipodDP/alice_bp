@@ -49,7 +49,7 @@ class Command(BaseCommand):
             # Show sample of tokens that would be deleted
             for token in expired_tokens[:5]:
                 self.stdout.write(
-                    f'  - Token for Telegram user {token.telegram_user_id}, '
+                    f'  - Token for Telegram user {token.telegram_user_id_hash}, '
                     f'expired at {token.expires_at}'
                 )
             if count > 5:

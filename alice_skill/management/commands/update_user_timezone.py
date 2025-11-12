@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class Command(BaseCommand):
-    help = 'Update timezone for a user by alice_user_id or telegram_user_id'
+    help = 'Update timezone for a user by alice_user_id or telegram_user_id_hash'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -14,9 +14,9 @@ class Command(BaseCommand):
             required=False,
         )
         parser.add_argument(
-            '--telegram-user-id',
+            '--telegram-user-id-hash',
             type=str,
-            help='Telegram user ID',
+            help='Telegram user ID hash',
             required=False,
         )
         parser.add_argument(
@@ -28,10 +28,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         alice_user_id = options.get('alice_user_id')
-        telegram_user_id = options.get('telegram_user_id')
+        telegram_user_id_hash = options.get('telegram_user_id_hash')
         timezone_str = options.get('timezone').strip()
 
-        if not alice_user_id and not telegram_user_id:
+        if not alice_user_id and not telegram_user_id_hash:
             self.stdout.write(
                 self.style.ERROR('Please provide --alice-user-id or --telegram-user-id')
             )
@@ -52,8 +52,8 @@ class Command(BaseCommand):
                 user = AliceUser.objects.get(alice_user_id=alice_user_id)
                 identifier = f"alice_user_id '{alice_user_id}'"
             else:
-                user = AliceUser.objects.get(telegram_user_id=telegram_user_id)
-                identifier = f"telegram_user_id '{telegram_user_id}'"
+                user = AliceUser.objects.get(telegram_user_id_hash=telegram_user_id_hash)
+                identifier = f"telegram_user_id_hash '{telegram_user_id_hash}'"
 
             old_timezone = user.timezone
             user.timezone = timezone_str

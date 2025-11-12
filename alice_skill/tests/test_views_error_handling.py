@@ -6,7 +6,6 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from alice_skill.helpers import get_hashed_telegram_id
 from alice_skill.messages import GenerateLinkTokenViewMessages
 
 
@@ -37,9 +36,8 @@ class ViewErrorHandlingTest(APITestCase):
                 HTTP_AUTHORIZATION=f'Token {settings.API_TOKEN}',
             )
 
-            hashed_telegram_id = get_hashed_telegram_id(str(self.telegram_user_id))
             mock_generate_link_token.assert_called_once_with(
-                telegram_user_id=hashed_telegram_id
+                telegram_user_id=str(self.telegram_user_id)
             )
 
             self.assertEqual(

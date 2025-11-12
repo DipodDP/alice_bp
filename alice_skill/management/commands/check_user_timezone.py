@@ -3,7 +3,7 @@ from alice_skill.models import AliceUser
 
 
 class Command(BaseCommand):
-    help = 'Check timezone for a user by alice_user_id or telegram_user_id'
+    help = 'Check timezone for a user by alice_user_id or telegram_user_id_hash'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -12,9 +12,9 @@ class Command(BaseCommand):
             help='Alice user ID to check',
         )
         parser.add_argument(
-            '--telegram-user-id',
+            '--telegram-user-id-hash',
             type=str,
-            help='Telegram user ID to check',
+            help='Telegram user ID hash to check',
         )
         parser.add_argument(
             '--list-all',
@@ -29,16 +29,16 @@ class Command(BaseCommand):
             for user in users:
                 self.stdout.write(
                     f'  alice_user_id: {user.alice_user_id or "(None)"}, '
-                    f'telegram_user_id: {user.telegram_user_id or "(None)"}, '
+                    f'telegram_user_id_hash: {user.telegram_user_id_hash or "(None)"}, '
                     f"timezone: '{user.timezone}' (type: {type(user.timezone).__name__}, "
                     f'empty: {not user.timezone or user.timezone.strip() == ""})'
                 )
             return
 
         alice_user_id = options.get('alice_user_id')
-        telegram_user_id = options.get('telegram_user_id')
+        telegram_user_id_hash = options.get('telegram_user_id_hash')
 
-        if not alice_user_id and not telegram_user_id:
+        if not alice_user_id and not telegram_user_id_hash:
             self.stdout.write(
                 self.style.ERROR('Please provide --alice-user-id or --telegram-user-id')
             )
@@ -49,13 +49,13 @@ class Command(BaseCommand):
                 user = AliceUser.objects.get(alice_user_id=alice_user_id)
                 self.stdout.write(f"\nUser found by alice_user_id '{alice_user_id}':")
             else:
-                user = AliceUser.objects.get(telegram_user_id=telegram_user_id)
+                user = AliceUser.objects.get(telegram_user_id_hash=telegram_user_id_hash)
                 self.stdout.write(
-                    f"\nUser found by telegram_user_id '{telegram_user_id}':"
+                    f"\nUser found by telegram_user_id_hash '{telegram_user_id_hash}':"
                 )
 
             self.stdout.write(f'  alice_user_id: {user.alice_user_id}')
-            self.stdout.write(f'  telegram_user_id: {user.telegram_user_id}')
+            self.stdout.write(f'  telegram_user_id_hash: {user.telegram_user_id_hash}')
             self.stdout.write(f"  timezone: '{user.timezone}'")
             self.stdout.write(f'  timezone type: {type(user.timezone).__name__}')
             self.stdout.write(f'  timezone is None: {user.timezone is None}')

@@ -13,7 +13,7 @@ class TestManagementCommands(TestCase):
         self.alice_user1 = AliceUser.objects.create(
             user=self.django_user1,
             alice_user_id="alice_user_1",
-            telegram_user_id="telegram_user_1",
+            telegram_user_id_hash="telegram_user_1",
             timezone="Europe/Moscow"
         )
 
@@ -21,7 +21,7 @@ class TestManagementCommands(TestCase):
         self.alice_user2 = AliceUser.objects.create(
             user=self.django_user2,
             alice_user_id="alice_user_2",
-            telegram_user_id="telegram_user_2",
+            telegram_user_id_hash="telegram_user_2",
             timezone="Asia/Krasnoyarsk"
         )
 
@@ -33,8 +33,8 @@ class TestManagementCommands(TestCase):
 
     def test_check_user_timezone_by_telegram_id(self):
         out = io.StringIO()
-        call_command('check_user_timezone', '--telegram-user-id', self.alice_user2.telegram_user_id, stdout=out)
-        self.assertIn("User found by telegram_user_id", out.getvalue())
+        call_command('check_user_timezone', '--telegram-user-id-hash', self.alice_user2.telegram_user_id_hash, stdout=out)
+        self.assertIn("User found by telegram_user_id_hash", out.getvalue())
         self.assertIn("Asia/Krasnoyarsk", out.getvalue())
 
     def test_check_user_timezone_list_all(self):
@@ -76,8 +76,8 @@ class TestManagementCommands(TestCase):
         out = io.StringIO()
         call_command(
             'update_user_timezone',
-            '--telegram-user-id',
-            self.alice_user2.telegram_user_id,
+            '--telegram-user-id-hash',
+            self.alice_user2.telegram_user_id_hash,
             '--timezone',
             'UTC',
             stdout=out
@@ -114,12 +114,12 @@ class TestManagementCommands(TestCase):
 
     def test_cleanup_expired_tokens(self):
         AccountLinkToken.objects.create(
-            telegram_user_id="1",
+            telegram_user_id_hash="1",
             token_hash="1",
             expires_at=timezone.now() - timedelta(hours=1)
         )
         AccountLinkToken.objects.create(
-            telegram_user_id="2",
+            telegram_user_id_hash="2",
             token_hash="2",
             expires_at=timezone.now() + timedelta(hours=1)
         )
@@ -130,7 +130,7 @@ class TestManagementCommands(TestCase):
 
     def test_cleanup_expired_tokens_no_expired(self):
         AccountLinkToken.objects.create(
-            telegram_user_id="1",
+            telegram_user_id_hash="1",
             token_hash="1",
             expires_at=timezone.now() + timedelta(hours=1)
         )
@@ -141,7 +141,7 @@ class TestManagementCommands(TestCase):
 
     def test_cleanup_expired_tokens_dry_run(self):
         AccountLinkToken.objects.create(
-            telegram_user_id="1",
+            telegram_user_id_hash="1",
             token_hash="1",
             expires_at=timezone.now() - timedelta(hours=1)
         )

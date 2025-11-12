@@ -10,7 +10,7 @@ from .models import BloodPressureMeasurement, AliceUser
 class AliceUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = AliceUser
-        fields = ["id", "alice_user_id", "telegram_user_id"]
+        fields = ["id", "alice_user_id", "telegram_user_id_hash"]
 
 
 class GenerateLinkTokenRequestSerializer(serializers.Serializer):

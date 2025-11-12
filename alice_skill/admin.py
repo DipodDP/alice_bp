@@ -11,13 +11,13 @@ class BloodPressureMeasurementAdmin(admin.ModelAdmin):
 
 @admin.register(AliceUser)
 class AliceUserAdmin(admin.ModelAdmin):
-    list_display = ("alice_user_id", "telegram_user_id", "timezone", "created_at")
+    list_display = ("alice_user_id", "telegram_user_id_hash", "timezone", "created_at")
     list_filter = ("timezone",)
-    search_fields = ("alice_user_id", "telegram_user_id")
+    search_fields = ("alice_user_id", "telegram_user_id_hash")
 
 
 @admin.register(AccountLinkToken)
 class AccountLinkTokenAdmin(admin.ModelAdmin):
-    list_display = ("telegram_user_id", "used", "created_at", "expires_at")
+    list_display = ("telegram_user_id_hash", "used", "created_at", "expires_at")
     list_filter = ("used",)
-    search_fields = ("telegram_user_id",)
+    search_fields = ("telegram_user_id_hash",)

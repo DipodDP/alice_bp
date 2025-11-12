@@ -3,7 +3,7 @@ import re
 import secrets
 import hmac
 from . import messages
-from .helpers import replace_latin_homoglyphs
+from .helpers import get_hashed_telegram_id, replace_latin_homoglyphs
 from .models import AliceUser, AccountLinkToken
 from .wordlist import WORDLIST
 from django.conf import settings
@@ -31,10 +31,10 @@ def generate_link_token(telegram_user_id: str) -> str:
     Generates a unique plaintext token in the format "word-number", stores its hash in the database, and returns the plaintext token.
     The token consists of a random word from a predefined wordlist and a random 3-digit number.
     """
-
+    hashed_telegram_id = get_hashed_telegram_id(telegram_user_id)
     # Check for rate limiting
     last_token = AccountLinkToken.objects.filter(
-        telegram_user_id=telegram_user_id
+        telegram_user_id_hash=hashed_telegram_id
     ).order_by('-created_at').first()
 
     if last_token and (timezone.now() - last_token.created_at).total_seconds() < RATE_LIMIT_SECONDS:
@@ -55,7 +55,7 @@ def generate_link_token(telegram_user_id: str) -> str:
 
     AccountLinkToken.objects.create(
         token_hash=token_hash,
-        telegram_user_id=telegram_user_id,
+        telegram_user_id_hash=hashed_telegram_id,
         expires_at=expires_at,
         used=False
     )
@@ -109,7 +109,7 @@ def _generate_candidate_phrases(tokens: list[str]) -> list[str]:
 def match_webhook_to_telegram_user(webhook_json: dict) -> str | None:
     """
     Matches incoming Alice webhook NLU tokens against stored AccountLinkTokens.
-    Returns the telegram_user_id if a match is found, otherwise None.
+    Returns the telegram_user_id_hash if a match is found, otherwise None.
     This optimized version generates candidate phrases first and then performs a single DB query.
     """
     alice_user_id = webhook_json.get("session", {}).get("user_id") or webhook_json.get("session", {}).get("user", {}).get("user_id")
@@ -142,14 +142,14 @@ def match_webhook_to_telegram_user(webhook_json: dict) -> str | None:
     account_link_token.used = True
     account_link_token.save()
 
-    telegram_user_id = account_link_token.telegram_user_id
+    telegram_user_id_hash = account_link_token.telegram_user_id_hash
 
     user, _ = AliceUser.objects.get_or_create(alice_user_id=alice_user_id)
-    AliceUser.objects.filter(telegram_user_id=telegram_user_id).exclude(pk=user.pk).update(telegram_user_id=None)
-    user.telegram_user_id = telegram_user_id
+    AliceUser.objects.filter(telegram_user_id_hash=telegram_user_id_hash).exclude(pk=user.pk).update(telegram_user_id_hash=None)
+    user.telegram_user_id_hash = telegram_user_id_hash
     user.save()
 
-    return account_link_token.telegram_user_id
+    return account_link_token.telegram_user_id_hash
 
 
 def get_alice_user(alice_user_id: str = None, telegram_user_id: str = None) -> AliceUser | None:
@@ -163,7 +163,7 @@ def get_alice_user(alice_user_id: str = None, telegram_user_id: str = None) -> A
     if alice_user_id:
         user = AliceUser.objects.filter(alice_user_id=alice_user_id).first()
     elif telegram_user_id:
-        user = AliceUser.objects.filter(telegram_user_id=telegram_user_id).first()
+        user = AliceUser.objects.filter(telegram_user_id_hash=get_hashed_telegram_id(telegram_user_id)).first()
 
     return user
 

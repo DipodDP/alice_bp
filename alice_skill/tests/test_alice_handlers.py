@@ -29,8 +29,7 @@ class AliceHandlerAPITestCase(APITestCase):
         mock_system_random.return_value.choice.return_value = 'мост'
         mock_system_random.return_value.randint.return_value = 627
 
-        # 1. Generate a token (simulating Telegram bot generating it)
-        plaintext_token = generate_link_token(self.hashed_telegram_user_id)
+        plaintext_token = generate_link_token(self.telegram_user_id)
 
         # 2. Simulate Alice webhook with NLU tokens containing the generated token
         data = {
@@ -59,7 +58,7 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # Check that the AccountLinkToken is marked as used
         account_link_token = AccountLinkToken.objects.get(
-            telegram_user_id=self.hashed_telegram_user_id
+            telegram_user_id_hash=self.hashed_telegram_user_id
         )
         self.assertTrue(account_link_token.used)
 
@@ -76,8 +75,8 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # 1. Generate a token (simulating Telegram bot generating it)
         plaintext_token_hyphen = generate_link_token(
-            self.hashed_telegram_user_id
-        )  # e.g., "инжир-788"
+            self.telegram_user_id
+        )
         plaintext_token_space = plaintext_token_hyphen.replace(
             '-', ' '
         )  # e.g., "инжир 788"
@@ -109,7 +108,7 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # Check that the AccountLinkToken is marked as used
         account_link_token = AccountLinkToken.objects.get(
-            telegram_user_id=self.hashed_telegram_user_id
+            telegram_user_id_hash=self.hashed_telegram_user_id
         )
         self.assertTrue(account_link_token.used)
 
@@ -128,8 +127,8 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # 1. Generate a token (simulating Telegram bot generating it)
         plaintext_token_hyphen = generate_link_token(
-            self.hashed_telegram_user_id
-        )  # e.g., "гвоздика-857"
+            self.telegram_user_id
+        )
         word, number = plaintext_token_hyphen.split('-')
 
         # 2. Simulate Alice webhook with NLU tokens containing the split number
@@ -159,7 +158,7 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # Check that the AccountLinkToken is marked as used
         account_link_token = AccountLinkToken.objects.get(
-            telegram_user_id=self.hashed_telegram_user_id
+            telegram_user_id_hash=self.hashed_telegram_user_id
         )
         self.assertTrue(account_link_token.used)
 
@@ -178,7 +177,7 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # 1. Generate a token (simulating Telegram bot generating it)
         plaintext_token_hyphen = generate_link_token(
-            self.hashed_telegram_user_id
+            self.telegram_user_id
         )  # e.g., "укроп-853"
         word, number = plaintext_token_hyphen.split('-')
 
@@ -209,7 +208,7 @@ class AliceHandlerAPITestCase(APITestCase):
 
         # Check that the AccountLinkToken is marked as used
         account_link_token = AccountLinkToken.objects.get(
-            telegram_user_id=self.hashed_telegram_user_id
+            telegram_user_id_hash=self.hashed_telegram_user_id
         )
         self.assertTrue(account_link_token.used)
 
@@ -225,9 +224,9 @@ class AliceHandlerAPITestCase(APITestCase):
         mock_system_random.return_value.randint.return_value = 122
 
         # 1. Generate a token and mark it as used
-        plaintext_token = generate_link_token(self.hashed_telegram_user_id)
+        plaintext_token = generate_link_token(self.telegram_user_id)
         account_link_token = AccountLinkToken.objects.get(
-            telegram_user_id=self.hashed_telegram_user_id
+            telegram_user_id_hash=self.hashed_telegram_user_id
         )
         account_link_token.used = True
         account_link_token.save()
@@ -261,7 +260,7 @@ class AliceHandlerAPITestCase(APITestCase):
         self.assertFalse(
             AliceUser.objects.filter(
                 alice_user_id=self.alice_user_id,
-                telegram_user_id=self.hashed_telegram_user_id,
+                telegram_user_id_hash=self.hashed_telegram_user_id,
             ).exists()
         )
 
@@ -298,7 +297,7 @@ class AliceHandlerAPITestCase(APITestCase):
         self.assertFalse(
             AliceUser.objects.filter(
                 alice_user_id=self.alice_user_id,
-                telegram_user_id=self.hashed_telegram_user_id,
+                telegram_user_id_hash=self.hashed_telegram_user_id,
             ).exists()
         )
 

@@ -136,8 +136,6 @@ class UserAwareAPIView(APIView):
     def get_user_from_request(self, request):
         alice_user_id = request.data.get('session', {}).get('user_id')
         telegram_user_id = request.data.get('telegram_user_id')
-        if telegram_user_id:
-            telegram_user_id = get_hashed_telegram_id(telegram_user_id)
         return get_alice_user(
             alice_user_id=alice_user_id, telegram_user_id=telegram_user_id
         )
@@ -165,7 +163,7 @@ class LinkStatusView(UserAwareAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if user.telegram_user_id:
+        if user.telegram_user_id_hash:
             return Response(
                 {'status': 'linked', 'message': LinkStatusViewMessages.LINKED},
                 status=status.HTTP_200_OK,
@@ -206,8 +204,8 @@ class UnlinkView(UserAwareAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            if user.telegram_user_id:
-                user.telegram_user_id = None
+            if user.telegram_user_id_hash:
+                user.telegram_user_id_hash = None
                 user.save()
                 return Response(
                     {'status': 'unlinked', 'message': UnlinkViewMessages.SUCCESS},
@@ -236,7 +234,7 @@ class UserByTelegramView(APIView):
     def get(self, request, telegram_id, *args, **kwargs):
         try:
             hashed_telegram_id = get_hashed_telegram_id(telegram_id)
-            user = AliceUser.objects.get(telegram_user_id=hashed_telegram_id)
+            user = AliceUser.objects.get(telegram_user_id_hash=hashed_telegram_id)
             serializer = AliceUserSerializer(user)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except AliceUser.DoesNotExist:
@@ -265,10 +263,9 @@ class GenerateLinkTokenView(APIView):
             )
 
         telegram_user_id = serializer.validated_data['telegram_user_id']
-        hashed_telegram_id = get_hashed_telegram_id(telegram_user_id)
 
         try:
-            plaintext_token = generate_link_token(telegram_user_id=hashed_telegram_id)
+            plaintext_token = generate_link_token(telegram_user_id=telegram_user_id)
             return Response(
                 {
                     'status': 'success',

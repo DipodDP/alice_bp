@@ -29,7 +29,7 @@ class WebhookMatchingLogicTest(TestCase):
         mock_system_random.return_value.randint.return_value = 627
 
         # Generate a token
-        generate_link_token(self.hashed_telegram_id)
+        generate_link_token(self.telegram_user_id)
         self.assertEqual(AccountLinkToken.objects.count(), 1)
         self.assertFalse(AccountLinkToken.objects.first().used)
 
@@ -56,7 +56,7 @@ class WebhookMatchingLogicTest(TestCase):
         mock_system_random.return_value.randint.return_value = 196
 
         # Generate a token
-        generate_link_token(self.hashed_telegram_id)
+        generate_link_token(self.telegram_user_id)
         self.assertEqual(AccountLinkToken.objects.count(), 1)
         self.assertFalse(AccountLinkToken.objects.first().used)
 
@@ -82,7 +82,7 @@ class WebhookMatchingLogicTest(TestCase):
         mock_system_random.return_value.randint.return_value = 627
 
         # 1. Telegram user requests token -> server stores hashed token -> returned plaintext
-        plaintext_token = generate_link_token(self.hashed_telegram_id)
+        plaintext_token = generate_link_token(self.telegram_user_id)
         self.assertEqual(AccountLinkToken.objects.count(), 1)
         self.assertFalse(AccountLinkToken.objects.first().used)
 
@@ -122,9 +122,9 @@ class WebhookMatchingLogicTest(TestCase):
 
         # --- Test 1: Token older than expiry does not match ---
         # Generate a token
-        plaintext_token_expired = generate_link_token(hashed_expired_user_id)
+        plaintext_token_expired = generate_link_token(expired_user_id)
         expired_token_obj = AccountLinkToken.objects.get(
-            telegram_user_id=hashed_expired_user_id
+            telegram_user_id_hash=hashed_expired_user_id
         )
 
         # Simulate time passing beyond expiry
@@ -141,13 +141,13 @@ class WebhookMatchingLogicTest(TestCase):
             self.assertIsNone(matched_telegram_user_id)
             self.assertFalse(
                 AccountLinkToken.objects.get(
-                    telegram_user_id=hashed_expired_user_id
+                    telegram_user_id_hash=hashed_expired_user_id
                 ).used
             )
 
         # --- Test 2: Token used once cannot be reused ---
         # Generate a fresh token
-        plaintext_token_used = generate_link_token(hashed_used_user_id)
+        plaintext_token_used = generate_link_token(used_user_id)
 
         # Use the token once (simulate a successful link)
         webhook_json_first_use = {
@@ -160,7 +160,7 @@ class WebhookMatchingLogicTest(TestCase):
         )
         self.assertEqual(matched_telegram_user_id_first_use, hashed_used_user_id)
         self.assertTrue(
-            AccountLinkToken.objects.get(telegram_user_id=hashed_used_user_id).used
+            AccountLinkToken.objects.get(telegram_user_id_hash=hashed_used_user_id).used
         )
 
         # Try to reuse the same token
@@ -172,5 +172,5 @@ class WebhookMatchingLogicTest(TestCase):
         with self.assertRaises(TokenAlreadyUsed):
             match_webhook_to_telegram_user(webhook_json_second_use)
         self.assertTrue(
-            AccountLinkToken.objects.get(telegram_user_id=hashed_used_user_id).used
+            AccountLinkToken.objects.get(telegram_user_id_hash=hashed_used_user_id).used
         )  # Still used

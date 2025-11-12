@@ -4,15 +4,21 @@ from django.utils import timezone
 
 
 class AliceUser(models.Model):
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True, blank=True)
-    alice_user_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
-    telegram_user_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    user = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE, null=True, blank=True
+    )
+    alice_user_id = models.CharField(
+        max_length=255, unique=True, null=True, blank=True, db_index=True
+    )
+    telegram_user_id_hash = models.CharField(
+        max_length=255, unique=True, null=True, blank=True
+    )
     timezone = models.CharField(max_length=50, default='UTC')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"AliceUser(user={self.user}, alice_id={self.alice_user_id}, tg_id={self.telegram_user_id})"
+        return f'AliceUser(user={self.user}, alice_user_id={self.alice_user_id}, telegram_user_id_hash={self.telegram_user_id_hash})'
 
 
 class BloodPressureMeasurementQuerySet(models.QuerySet):
@@ -50,7 +56,9 @@ class BloodPressureMeasurementQuerySet(models.QuerySet):
 
 
 class BloodPressureMeasurement(models.Model):
-    user = models.ForeignKey(AliceUser, on_delete=models.CASCADE, related_name='measurements')
+    user = models.ForeignKey(
+        AliceUser, on_delete=models.CASCADE, related_name='measurements'
+    )
     systolic = models.IntegerField()
     diastolic = models.IntegerField()
     pulse = models.IntegerField(null=True, blank=True)
@@ -66,19 +74,21 @@ class BloodPressureMeasurement(models.Model):
         ]
 
     def __str__(self):
-        return f"BP: {self.systolic}/{self.diastolic} at {self.measured_at.strftime('%Y-%m-%d %H:%M')}"
+        return f'BP: {self.systolic}/{self.diastolic} at {self.measured_at.strftime("%Y-%m-%d %H:%M")}'
 
 
 class AccountLinkToken(models.Model):
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
-    telegram_user_id = models.CharField(max_length=64, db_index=True)
+    telegram_user_id_hash = models.CharField(max_length=64, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     used = models.BooleanField(default=False)
 
     class Meta:
-        verbose_name = "Account Link Token"
-        verbose_name_plural = "Account Link Tokens"
+        verbose_name = 'Account Link Token'
+        verbose_name_plural = 'Account Link Tokens'
 
     def __str__(self):
-        return f"Token for Telegram User {self.telegram_user_id} (Used: {self.used})"
+        return (
+            f'Token for Telegram User {self.telegram_user_id_hash} (Used: {self.used})'
+        )

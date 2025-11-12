@@ -53,7 +53,7 @@ def create_word_number_token(secret):
 
         account_link_token = AccountLinkToken.objects.create(
             token_hash=token_hash,
-            telegram_user_id=hashed_telegram_id,
+            telegram_user_id_hash=hashed_telegram_id,
             expires_at=expires_at,
             used=used,
         )
@@ -123,7 +123,7 @@ def test_link_account_handler_with_word_number_code_success(
     assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is True
     assert AliceUser.objects.get(
         alice_user_id='test-alice-user-id'
-    ).telegram_user_id == get_hashed_telegram_id(telegram_user_id)
+    ).telegram_user_id_hash == get_hashed_telegram_id(telegram_user_id)
 
 
 def test_link_account_handler_with_word_number_code_fail_invalid_code(
@@ -248,13 +248,13 @@ def test_link_account_handler_update_telegram_user_id(
 ):
     """
     Test: If an Alice user already exists and is linked to a Telegram user,
-    linking them to a new Telegram user should update the telegram_user_id for that Alice user.
+    linking them to a new Telegram user should update the telegram_user_id_hash for that Alice user.
     """
     # 1. Create an existing Alice user linked to an initial Telegram user
     initial_telegram_user_id = '54321'
     AliceUser.objects.create(
         alice_user_id='user-first-try',
-        telegram_user_id=get_hashed_telegram_id(initial_telegram_user_id),
+        telegram_user_id_hash=get_hashed_telegram_id(initial_telegram_user_id),
     )
 
     # 2. Generate a new token for a DIFFERENT Telegram user
@@ -280,9 +280,9 @@ def test_link_account_handler_update_telegram_user_id(
     assert response.status_code == 200
     assert LinkAccountMessages.SUCCESS in response_data['response']['text']
 
-    # 4. Assert that the Alice user's telegram_user_id has been updated
+    # 4. Assert that the Alice user's telegram_user_id_hash has been updated
     user = AliceUser.objects.get(alice_user_id='user-first-try')
-    assert user.telegram_user_id == get_hashed_telegram_id(new_telegram_user_id)
+    assert user.telegram_user_id_hash == get_hashed_telegram_id(new_telegram_user_id)
     assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is True
 
 
@@ -294,12 +294,12 @@ def test_link_account_handler_conflict_telegram_user_id(
     and a new alice_user_id tries to link to that same telegram_user_id,
     the previous link should be broken and the new link established.
     """
-    # 1. Create an existing User with a telegram_user_id linked to an initial alice_user_id
+    # 1. Create an existing User with a telegram_user_id_hash linked to an initial alice_user_id
     existing_alice_user_id = 'alice-user-old'
     telegram_id_in_conflict = '112233'
     AliceUser.objects.create(
         alice_user_id=existing_alice_user_id,
-        telegram_user_id=get_hashed_telegram_id(telegram_id_in_conflict),
+        telegram_user_id_hash=get_hashed_telegram_id(telegram_id_in_conflict),
     )
 
     # 2. Generate a token for the SAME telegram_user_id
@@ -325,11 +325,11 @@ def test_link_account_handler_conflict_telegram_user_id(
     assert response.status_code == 200
     assert LinkAccountMessages.SUCCESS in response_data['response']['text']
 
-    # 4. Assert that the original alice_user_id's telegram_user_id is now None (unlinked)
+    # 4. Assert that the original alice_user_id's telegram_user_id_hash is now None (unlinked)
     old_user = AliceUser.objects.get(alice_user_id=existing_alice_user_id)
-    assert old_user.telegram_user_id is None
+    assert old_user.telegram_user_id_hash is None
 
-    # 5. Assert that the new alice_user_id is now linked to the telegram_user_id
+    # 5. Assert that the new alice_user_id is now linked to the telegram_user_id_hash
     new_user = AliceUser.objects.get(alice_user_id=new_alice_user_id)
-    assert new_user.telegram_user_id == get_hashed_telegram_id(telegram_id_in_conflict)
+    assert new_user.telegram_user_id_hash == get_hashed_telegram_id(telegram_id_in_conflict)
     assert AccountLinkToken.objects.get(pk=account_link_token.pk).used is True

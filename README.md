@@ -77,10 +77,15 @@ For privacy and security, Telegram user IDs are hashed using HMAC-SHA256 before 
 
 **Required Environment Variables:**
 
+*   **`SECRET_KEY`**: Django secret key for cryptographic signing. Generate it using the methods below or the management command.
 *   **`TELEGRAM_ID_HMAC_KEY`**: A secret key used for HMAC-SHA256 hashing of Telegram user IDs. This must be a secure, random string. Generate it using one of the methods described in the "Token Generation Examples" section below.
 *   **`LINK_SECRET`**: A secret key used for hashing account linking tokens. This must be a secure, random string. Generate it using one of the methods described in the "Token Generation Examples" section below.
 
 **Important:** Both `TELEGRAM_ID_HMAC_KEY` and `LINK_SECRET` are required and must be set in your environment. The application will fail to start if these are not configured.
+
+Optional (recommended in production, optional for local development; see sections below):
+*   **`ALICE_WEBHOOK_SECRET`**
+*   **`BOT_WEBHOOK_SECRET`**
 
 #### Token Generation Examples
 
@@ -96,15 +101,13 @@ openssl rand -hex 32
 head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32
 ```
 
-**Django:**
+**Django (recommended):**
 ```bash
-echo "SECRET_KEY=$(uv run - <<'PY'                                                                                                     ─╯
-from django.core.management.utils import get_random_secret_key
-print(get_random_secret_key())
-PY
-)" >> .env
+uv run manage.py generate_secret_keys >> .env
 chmod 600 .env
 ```
+
+This command prints and appends all required secrets (including `SECRET_KEY`, `TELEGRAM_ID_HMAC_KEY`, `LINK_SECRET`, and optional webhook secrets) to your `.env` file.
 
 
 ### Alice (Yandex.Dialogs)
