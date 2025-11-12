@@ -4,17 +4,25 @@ from rest_framework import serializers
 
 from .messages import SerializerMessages
 
-from .models import BloodPressureMeasurement, User
+from .models import BloodPressureMeasurement, AliceUser
 
 
-class UserSerializer(serializers.ModelSerializer):
+class AliceUserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User
-        fields = ["id", "alice_user_id", "telegram_user_id"]
+        model = AliceUser
+        fields = ["id", "alice_user_id", "telegram_user_id_hash"]
+
+
+class GenerateLinkTokenRequestSerializer(serializers.Serializer):
+    # This field accepts the plaintext Telegram User ID as a string.
+    # No specific format validation is performed here, as the value is
+    # immediately hashed by the backend. Any string is acceptable.
+    telegram_user_id = serializers.CharField(max_length=64)
 
 
 class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
-    user_id = serializers.CharField(required=True, allow_blank=False)
+    user = serializers.PrimaryKeyRelatedField(queryset=AliceUser.objects.all())
+    measured_at = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%S%z", required=False, allow_null=True)
     MIN_SYSTOLIC = 50
     MAX_SYSTOLIC = 300
     MIN_DIASTOLIC = 30
@@ -57,19 +65,22 @@ class BloodPressureMeasurementSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         tz_str = self.context.get("timezone")
 
-        if tz_str:
+        # Handle timezone conversion - tz_str should be a non-empty string
+        if tz_str and tz_str.strip():
             try:
-                tz = ZoneInfo(tz_str)
+                tz = ZoneInfo(tz_str.strip())
                 measured_at_dt = instance.measured_at
                 if measured_at_dt:
+                    # Convert to user's timezone
                     representation["measured_at"] = measured_at_dt.astimezone(tz).isoformat()
             except ZoneInfoNotFoundError:
-                pass  # Ignore invalid timezone, use default serialization
+                # Invalid timezone, use default serialization (UTC)
+                pass
         return representation
 
     class Meta:
         model = BloodPressureMeasurement
-        fields = ["user_id", "systolic", "diastolic", "pulse", "measured_at"]
+        fields = ["user", "systolic", "diastolic", "pulse", "measured_at"]
 
 
 class NLUObjectSerializer(serializers.Serializer):

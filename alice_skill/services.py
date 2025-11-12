@@ -3,11 +3,13 @@ import re
 import secrets
 import hmac
 from . import messages
-from .models import User, AccountLinkToken
+from .helpers import get_hashed_telegram_id, replace_latin_homoglyphs
+from .models import AliceUser, AccountLinkToken
 from .wordlist import WORDLIST
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
+from django.db import connection, OperationalError
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +26,15 @@ RATE_LIMIT_SECONDS = getattr(settings, "ALICE_LINK_RATE_LIMIT_SECONDS", 60)
 TOKEN_LIFETIME_MINUTES = getattr(settings, "ALICE_LINK_TOKEN_LIFETIME_MINUTES", 10)
 
 
-def generate_link_token(telegram_user_id: int) -> str:
+def generate_link_token(telegram_user_id: str) -> str:
     """
     Generates a unique plaintext token in the format "word-number", stores its hash in the database, and returns the plaintext token.
     The token consists of a random word from a predefined wordlist and a random 3-digit number.
     """
-
+    hashed_telegram_id = get_hashed_telegram_id(telegram_user_id)
     # Check for rate limiting
     last_token = AccountLinkToken.objects.filter(
-        telegram_user_id=telegram_user_id
+        telegram_user_id_hash=hashed_telegram_id
     ).order_by('-created_at').first()
 
     if last_token and (timezone.now() - last_token.created_at).total_seconds() < RATE_LIMIT_SECONDS:
@@ -53,7 +55,7 @@ def generate_link_token(telegram_user_id: int) -> str:
 
     AccountLinkToken.objects.create(
         token_hash=token_hash,
-        telegram_user_id=telegram_user_id,
+        telegram_user_id_hash=hashed_telegram_id,
         expires_at=expires_at,
         used=False
     )
@@ -72,8 +74,8 @@ def _normalize_nlu_tokens(nlu_tokens: list[str]) -> list[str]:
         sub_tokens = token.split(' ')
         for sub_token in sub_tokens:
             word = sub_token.lower().replace('ё', 'е')
-            # Homoglyph replacement
-            word = word.replace('a', 'а').replace('e', 'е').replace('o', 'о').replace('p', 'р').replace('c', 'с').replace('x', 'х').replace('y', 'у')
+            # Homoglyph replacement using utility function
+            word = replace_latin_homoglyphs(word)
 
             if re.match(r'^[а-яё]+-\d{3}$', word):
                 normalized_tokens.append(word)
@@ -104,10 +106,10 @@ def _generate_candidate_phrases(tokens: list[str]) -> list[str]:
     return list(set(phrases))
 
 
-def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
+def match_webhook_to_telegram_user(webhook_json: dict) -> str | None:
     """
     Matches incoming Alice webhook NLU tokens against stored AccountLinkTokens.
-    Returns the telegram_user_id if a match is found, otherwise None.
+    Returns the telegram_user_id_hash if a match is found, otherwise None.
     This optimized version generates candidate phrases first and then performs a single DB query.
     """
     alice_user_id = webhook_json.get("session", {}).get("user_id") or webhook_json.get("session", {}).get("user", {}).get("user_id")
@@ -140,12 +142,58 @@ def match_webhook_to_telegram_user(webhook_json: dict) -> int | None:
     account_link_token.used = True
     account_link_token.save()
 
-    telegram_user_id_str = str(account_link_token.telegram_user_id)
+    telegram_user_id_hash = account_link_token.telegram_user_id_hash
 
-    user, _ = User.objects.get_or_create(alice_user_id=alice_user_id)
-    User.objects.filter(telegram_user_id=telegram_user_id_str).exclude(pk=user.pk).update(telegram_user_id=None)
-    user.telegram_user_id = telegram_user_id_str
+    user, _ = AliceUser.objects.get_or_create(alice_user_id=alice_user_id)
+    AliceUser.objects.filter(telegram_user_id_hash=telegram_user_id_hash).exclude(pk=user.pk).update(telegram_user_id_hash=None)
+    user.telegram_user_id_hash = telegram_user_id_hash
     user.save()
 
-    return account_link_token.telegram_user_id
+    return account_link_token.telegram_user_id_hash
 
+
+def get_alice_user(alice_user_id: str = None, telegram_user_id: str = None) -> AliceUser | None:
+    """
+    Retrieves an AliceUser by either alice_user_id or telegram_user_id.
+    """
+    if not alice_user_id and not telegram_user_id:
+        return None
+
+    user = None
+    if alice_user_id:
+        user = AliceUser.objects.filter(alice_user_id=alice_user_id).first()
+    elif telegram_user_id:
+        user = AliceUser.objects.filter(telegram_user_id_hash=get_hashed_telegram_id(telegram_user_id)).first()
+
+    return user
+
+
+def process_alice_request(handlers: list, validated_request: dict) -> str | None:
+    """
+    Iterates through handlers to process an Alice request and returns a response text.
+    """
+    response_text = None
+    for handler in handlers:
+        try:
+            response_text = handler.handle(validated_request)
+        except Exception as e:
+            logger.exception(
+                f'Handler raised an exception:\n {e};\n...continuing to next handler'
+            )
+            continue
+        if response_text:
+            break
+    return response_text
+
+
+def check_health():
+    """
+    Checks the health of the service, including database connectivity.
+    Returns a dictionary with the status.
+    """
+    try:
+        connection.ensure_connection()
+        return {'status': 'healthy', 'database': 'connected'}
+    except OperationalError as e:
+        logger.error(f'Health check failed: {e}')
+        return {'status': 'unhealthy', 'database': 'disconnected', 'error': str(e)}

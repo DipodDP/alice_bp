@@ -114,6 +114,7 @@ def webhook_handler(request):
         webapp_host = getattr(settings, "WEBAPP_HOST", "localhost")
         webapp_port = getattr(settings, "WEBAPP_PORT", 8080)
         local_url = f"http://{webapp_host}:{webapp_port}{webhook_path}"
+        logger.debug(f"Incoming headers: {request.headers}")
         query = request.META.get("QUERY_STRING", "")
         if query:
             local_url = f"{local_url}?{query}"

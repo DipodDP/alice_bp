@@ -24,14 +24,16 @@ class BloodPressureApi(BaseClient):
             headers["Authorization"] = f"Token {self._token}"
         return headers
 
-    def _parse_results(self, data: dict | list) -> list:
-        """Extract results from paginated or plain list response."""
+    def _parse_results(
+        self, data: dict | list
+    ) -> tuple[list[dict], int | None, str | None]:
+        """Extract results, total count, and next page URL from paginated or plain list response."""
         if isinstance(data, dict) and "results" in data:
-            return list(data["results"])
+            return list(data["results"]), data.get("count"), data.get("next")
         if isinstance(data, list):
-            return data
+            return data, None, None  # No total count or next URL for plain list
         self.log.error("Unexpected response format: %r", type(data))
-        return []
+        return [], None, None
 
     async def get_measurements(
         self,
@@ -39,35 +41,39 @@ class BloodPressureApi(BaseClient):
         start_date: str,
         end_date: str,
         ordering: str = "-created_at",
-    ) -> list[dict]:
+        page: int = 1,
+        page_size: int = 5,
+    ) -> tuple[list[dict], int | None, str | None]:
         """Fetch measurements for a user within a date range."""
         try:
             _, data = await self._make_request(
                 method="GET",
-                url="/measurements/",
+                url="/api/v1/measurements/",
                 params={
                     "user_id": user_id,
                     "created_at__gte": start_date,
                     "created_at__lte": end_date,
                     "ordering": ordering,
+                    "page": page,
+                    "page_size": page_size,
                 },
                 headers=self._auth_headers(),
             )
             return self._parse_results(data)
         except ClientError as e:
             self.log.error("Failed to fetch measurements: %s", e)
-            return []
+            return [], None, None
 
     async def get_last_measurement(self, user_id: str) -> Optional[dict]:
         """Fetch latest measurement for a user."""
         try:
             _, data = await self._make_request(
                 method="GET",
-                url="/measurements/",
+                url="/api/v1/measurements/",
                 params={"user_id": user_id, "ordering": "-created_at"},
                 headers=self._auth_headers(),
             )
-            results = self._parse_results(data)
+            results, _, _ = self._parse_results(data)
             return results[0] if results else None
         except ClientError as e:
             self.log.error("Failed to fetch last measurement: %s", e)
@@ -96,22 +102,21 @@ class BloodPressureApi(BaseClient):
             )
             return None
 
-
     async def initiate_link(self, telegram_user_id: str) -> Optional[dict]:
         """Initiate the linking process by requesting a code."""
         try:
             status_code, data = await self._make_request(
                 method="POST",
-                url="/api/v1/link/generate-token/", # Updated URL
+                url="/api/v1/link/generate-token/",  # Updated URL
                 json={
-                    "telegram_user_id": telegram_user_id # Updated parameter name
+                    "telegram_user_id": telegram_user_id  # Updated parameter name
                 },
                 headers=self._auth_headers(),
             )
-            if status_code == 201: # 201 Created for successful initiation
+            if status_code == 201:  # 201 Created for successful initiation
                 return data
             self.log.error(
-                f"Failed to initiate link for user {telegram_user_id}. " # Updated log message
+                f"Failed to initiate link for user {telegram_user_id}. "  # Updated log message
                 f"Status: {status_code}, Response: {data}"
             )
             return data

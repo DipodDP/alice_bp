@@ -7,12 +7,14 @@ from .views import (
     UnlinkView,
     UserByTelegramView,
     GenerateLinkTokenView,
+    health_check,
 )
 
 router = DefaultRouter()
-router.register(r"measurements", BloodPressureMeasurementViewSet, basename="measurement")
+router.register(r"api/v1/measurements", BloodPressureMeasurementViewSet, basename="measurement")
 
 urlpatterns = [
+    path("health/", health_check, name="health-check"),
     path("alice_webhook/", AliceWebhookView.as_view(), name="alice-webhook"),
     path("api/v1/link/status/", LinkStatusView.as_view(), name="link-status"),
     path("api/v1/link/unlink/", UnlinkView.as_view(), name="link-unlink"),

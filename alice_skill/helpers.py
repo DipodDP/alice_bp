@@ -1,8 +1,86 @@
+import logging
 import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import hmac
+import hashlib
 
+from django.conf import settings
 from .messages import DateFormattingMessages
+from .models import AliceUser
+
+logger = logging.getLogger(__name__)
+
+
+def get_hashed_telegram_id(telegram_id: str) -> str:
+    """
+    Hashes the given telegram_id using HMAC-SHA256 with a secret key from settings.
+    """
+    secret_key = settings.TELEGRAM_ID_HMAC_KEY
+    return hmac.new(
+        secret_key.encode("utf-8"),
+        str(telegram_id).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def get_user_context(request):
+    """
+    Adds user and timezone information to the serializer context.
+    """
+    context = {}
+    user = request.user
+    is_bot_request = getattr(request, 'is_bot', False)
+
+    # For authenticated users, add their AliceUser and timezone to the context
+    if user.is_authenticated:
+        try:
+            alice_user = AliceUser.objects.select_related('user').get(user=user)
+            context['alice_user'] = alice_user
+            context['timezone'] = alice_user.timezone or 'UTC'
+        except AliceUser.DoesNotExist:
+            pass  # No linked AliceUser, so no user-specific context is added
+
+    # For bot requests, find the user by user_id and add their info to the context
+    elif is_bot_request:
+        user_id = request.query_params.get('user_id')
+        if user_id:
+            try:
+                alice_user = AliceUser.objects.get(alice_user_id=user_id)
+                context['alice_user'] = alice_user
+                context['timezone'] = alice_user.timezone or 'UTC'
+                logger.debug(
+                    f"Bot request: Found user {user_id} with timezone '{alice_user.timezone}'"
+                )
+            except AliceUser.DoesNotExist:
+                logger.warning(
+                    f"Bot request: User with alice_user_id '{user_id}' not found"
+                )
+
+    return context
+
+
+
+def replace_latin_homoglyphs(text: str) -> str:
+    """
+    Replaces Latin characters that look like Cyrillic with their Cyrillic equivalents.
+    This handles common ASR errors where Latin characters are confused with Cyrillic.
+
+    Args:
+        text: Input string that may contain Latin homoglyphs
+
+    Returns:
+        String with Latin homoglyphs replaced by Cyrillic characters
+    """
+    return (
+        text.replace('a', 'а')
+        .replace('e', 'е')
+        .replace('o', 'о')
+        .replace('p', 'р')
+        .replace('c', 'с')
+        .replace('x', 'х')
+        .replace('y', 'у')
+    )
 
 
 def normalize_spoken_token(tokens: list[str]) -> str:
@@ -19,16 +97,8 @@ def normalize_spoken_token(tokens: list[str]) -> str:
         word = token.lower()
         # Replace 'ё' with 'е'
         word = word.replace("ё", "е")
-        # Replace Latin lookalikes (basic set)
-        word = (
-            word.replace("a", "а")
-            .replace("e", "е")
-            .replace("o", "о")
-            .replace("p", "р")
-            .replace("c", "с")
-            .replace("x", "х")
-            .replace("y", "у")
-        )
+        # Replace Latin lookalikes using utility function
+        word = replace_latin_homoglyphs(word)
         # Remove all non-Cyrillic characters (including punctuation, numbers, etc.)
         word = re.sub(r"[^а-я]", "", word)
         if word:

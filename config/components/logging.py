@@ -33,5 +33,10 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": False,
         },
+        "pyanywhere_bg": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
     },
 }
